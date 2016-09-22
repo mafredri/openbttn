@@ -1,0 +1,48 @@
+# CFLAGS		+= -mthumb -mcpu=cortex-m3 -mfix-cortex-m3-ldrd -g -std=gnu99
+# CLFAGS		+= -fno-common -ffunction-sections -fdata-sections
+# LDFLAGS		+= -Wl,--gc-sections
+# LDFLAGS		+= -specs=nosys.specs -specs=nano.specs
+# LDLIBS		+= -Wl,--start-group -lc -lgcc -lnosys -Wl,--end-group
+
+DEVICE		= stm32l100rc
+OPENCM3_DIR	= ../libopencm3
+
+OBJS		+= main.o debug.o led.o button.o interrupt.o
+
+CFLAGS		+= -Os -ggdb3 -std=gnu99
+CFLAGS		+= -fno-common -fno-builtin
+CFLAGS		+= -Wall -Wextra -Wshadow
+CFLAGS		+= -ffunction-sections -fdata-sections
+CPPFLAGS	+= -MD
+LDFLAGS		+= -static -nostartfiles
+LDFLAGS		+= -specs=nosys.specs -specs=nano.specs
+LDLIBS		+= -Wl,--start-group -lc -lgcc -lnosys -Wl,--end-group
+
+include $(OPENCM3_DIR)/mk/genlink-config.mk
+include $(OPENCM3_DIR)/mk/gcc-config.mk
+
+.PHONY: clean all console debug openocd watch
+
+all: main.elf
+
+bin: main.bin
+elf: main.elf
+hex: main.hex
+
+clean:
+	$(Q)$(RM) -rf *.{o,d,elf,bin,hex,srec,list}
+
+console:
+	$(Q)stty -f /dev/cu.SLAB_USBtoUART 115200 2>/dev/null | cat /dev/cu.SLAB_USBtoUART
+
+debug:
+	$(Q)$(PREFIX)-gdb -tui --eval-command="target remote :3333" main.elf
+
+openocd:
+	$(Q)openocd -f ../openocd.cfg
+
+watch:
+	$(Q)ls -1 *.{c,h} | entr make
+
+include $(OPENCM3_DIR)/mk/genlink-rules.mk
+include $(OPENCM3_DIR)/mk/gcc-rules.mk
