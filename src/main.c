@@ -4,6 +4,7 @@
 #include "debug.h"
 #include "led.h"
 #include "syscfg.h"
+#include "wifi.h"
 
 volatile uint32_t system_delay = 0;
 
@@ -27,9 +28,7 @@ int main(void) {
   delay(80);
 
   debug_init();
-
-  // Power on Wifi module.
-  gpio_set(GPIOB, GPIO2);
+  wifi_init();
 
   button_enable();
 
@@ -38,15 +37,32 @@ int main(void) {
 
   printf("\nBootup complete!\n");
 
-  uint32_t led_bits = 0b100100100100100100100100;
+  delay(5000);
+
+  printf("Configuring wifi module...\n");
+
+  wifi_send_string("AT\r\n");
+
+#if false
+  wifi_send_string("AT&F\r\n");  // Factory reset
+  wifi_send_string("AT+S.SSIDTXT=AP_SSID\r\n");
+  wifi_send_string("AT+S.SCFG=wifi_wpa_psk_text,AP_PASSWORD\r\n");
+  wifi_send_string("AT+S.SCFG=wifi_priv_mode,2\r\n");
+  wifi_send_string("AT+S.SCFG=wifi_mode,1\r\n");
+  wifi_send_string("AT+S.SCFG=ip_use_dhcp,1\r\n");
+  wifi_send_string("AT&W\r\n");       // Write settings
+  wifi_send_string("AT+CFUN=1\r\n");  // Reset wifi module
+  delay(5000);
+
+  // Perform HTTP GET request.
+  wifi_send_string("AT+S.HTTPGET=192.168.0.10,/,8000\r\n");
+  delay(5000);
+#endif
 
   printf("Entering main loop!\n");
 
-  while (1) {
-    leds_shift(led_bits);
-    led_bits = (led_bits << 1) + ((led_bits & 0x800000) >> 23);
-    delay(1000);
-  }
+  while (1)
+    ;
 
   return 0;
 }
