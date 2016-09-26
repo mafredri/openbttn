@@ -25,6 +25,13 @@ void pend_sv_handler(void) {
     ;
 };
 
+void WIFI_isr(void) {
+  if (usart_get_flag(WIFI_USART, USART_SR_RXNE)) {
+    uint16_t c = usart_recv(WIFI_USART);
+    printf("%c", c);
+  }
+}
+
 void BUTTON_isr(void) {
   if (exti_get_flag_status(EXTI13)) {
     exti_reset_request(EXTI13);
