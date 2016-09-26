@@ -24,6 +24,14 @@
 #define BUTTON_isr exti15_10_isr
 #define BUTTON_NVIC NVIC_EXTI15_10_IRQ
 
+#define RCC_WIFI_USART RCC_USART3
+#define WIFI_GPIO_PORT GPIOB
+#define WIFI_USART USART3
+#define WIFI_GPIO_TX GPIO10
+#define WIFI_GPIO_RX GPIO11
+#define WIFI_isr usart3_isr
+#define WIFI_NVIC_IRQ NVIC_USART3_IRQ
+
 #define LED_TIMER TIM3
 #define RCC_LED_TIMER RCC_TIM3
 

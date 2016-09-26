@@ -7,7 +7,7 @@
 DEVICE		= stm32l100rc
 OPENCM3_DIR	= ../libopencm3
 
-OBJS		+= main.o debug.o led.o button.o interrupt.o
+OBJS		+= main.o debug.o led.o button.o interrupt.o wifi.o
 
 CFLAGS		+= -Os -ggdb3 -std=gnu99
 CFLAGS		+= -fno-common -fno-builtin
