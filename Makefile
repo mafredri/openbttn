@@ -30,4 +30,4 @@ src: lib
 	@printf "  BUILD  $@\n":
 	$(Q)$(MAKE) --directory=./$@ OPENCM3_DIR=$(OPENCM3_DIR) $(RULES)
 
-.PHONY: build lib src install bin hex srec list images console debug openocd
+.PHONY: build lib src install bin hex srec list images

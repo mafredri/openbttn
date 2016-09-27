@@ -1,15 +1,9 @@
-# CFLAGS		+= -mthumb -mcpu=cortex-m3 -mfix-cortex-m3-ldrd -g -std=gnu99
-# CLFAGS		+= -fno-common -ffunction-sections -fdata-sections
-# LDFLAGS		+= -Wl,--gc-sections
-# LDFLAGS		+= -specs=nosys.specs -specs=nano.specs
-# LDLIBS		+= -Wl,--start-group -lc -lgcc -lnosys -Wl,--end-group
-
 DEVICE		= stm32l100rc
 OPENCM3_DIR	= ../libopencm3
 
 OBJS		+= main.o debug.o led.o button.o interrupt.o wifi.o
 
-CFLAGS		+= -Os -ggdb3 -std=gnu99
+CFLAGS		+= -mcpu=cortex-m3 -mthumb -Os -ggdb3 -std=gnu99
 CFLAGS		+= -fno-common -fno-builtin
 CFLAGS		+= -Wall -Wextra -Wshadow
 CFLAGS		+= -ffunction-sections -fdata-sections
