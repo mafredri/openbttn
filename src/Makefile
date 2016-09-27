@@ -8,6 +8,7 @@ CFLAGS		+= -fno-common -fno-builtin
 CFLAGS		+= -Wall -Wextra -Wshadow
 CFLAGS		+= -ffunction-sections -fdata-sections
 CPPFLAGS	+= -MD
+LDFLAGS		+= -Wl,--gc-sections
 LDFLAGS		+= -static -nostartfiles
 LDFLAGS		+= -specs=nosys.specs -specs=nano.specs
 LDLIBS		+= -Wl,--start-group -lc -lgcc -lnosys -Wl,--end-group
