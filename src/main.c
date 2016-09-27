@@ -42,6 +42,7 @@ int main(void) {
   printf("Configuring wifi module...\n");
 
   wifi_send_string("AT\r\n");
+  delay(100);
 
 #if false
   wifi_send_string("AT&F\r\n");  // Factory reset
