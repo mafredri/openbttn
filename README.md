@@ -30,16 +30,18 @@ Upload `main.elf` to your bttn using OpenOCD.
 ### What works
 
 * Board power
+* Leds
 * Debugging USART (e.g. for `printf` output)
-* Leds (rotating lights at the moment)
-* Pressing the button (prints duration in ms)
+* WIFI USART
+* Pressing the button sends a HTTP GET request
+    * Show led light for 2 seconds depending on HTTP Status Code
 
 ### Todo
 
-* Send commands to the SPWF01SA WIFI module
-* Read / parse http responses from the WIFI module
+* ~~Read / parse http responses from the WIFI module~~
 * Write led flashing presets
 * Short / long (/ extra long) press of button
+* Secure the internal SPWF01SA HTTP server
 
 ### Nice to have
 
