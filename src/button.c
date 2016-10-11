@@ -4,17 +4,6 @@
 
 volatile bool button_pressed;
 
-// Initialise a timer that calculates how
-// long the button was pressed (in ms).
-static void button_duration_timer(void) {
-  rcc_periph_clock_enable(RCC_TIM7);
-
-  timer_reset(TIM7);
-  timer_set_prescaler(TIM7, 31999);  // 32MHz / 1000Hz - 1
-  timer_set_period(TIM7, 0xffff);
-  timer_enable_counter(TIM7);
-}
-
 void button_enable(void) {
   rcc_periph_clock_enable(RCC_GPIOC);
   rcc_periph_clock_enable(RCC_SYSCFG);
@@ -30,7 +19,5 @@ void button_enable(void) {
   exti_enable_request(EXTI13);
 
   nvic_enable_irq(NVIC_EXTI15_10_IRQ);
-  nvic_set_priority(NVIC_EXTI15_10_IRQ, 3);
-
-  button_duration_timer();
+  nvic_set_priority(NVIC_EXTI15_10_IRQ, 4 << 4);
 }

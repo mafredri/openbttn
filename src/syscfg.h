@@ -9,6 +9,7 @@
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/timer.h>
 #include <libopencm3/stm32/usart.h>
+#include <libopencmsis/core_cm3.h>
 
 #define CORE_CLOCK (uint32_t)32000000
 
@@ -29,6 +30,8 @@
 #define WIFI_USART USART3
 #define WIFI_GPIO_TX GPIO10
 #define WIFI_GPIO_RX GPIO11
+#define WIFI_GPIO_CTS GPIO13
+#define WIFI_GPIO_RTS GPIO14
 #define WIFI_isr usart3_isr
 #define WIFI_NVIC_IRQ NVIC_USART3_IRQ
 
