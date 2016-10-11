@@ -2,6 +2,7 @@
 
 #include "led.h"
 #include "syscfg.h"
+#include "wifi.h"
 
 void sys_tick_handler(void) {
   if (system_delay) {

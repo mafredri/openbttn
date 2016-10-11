@@ -235,6 +235,8 @@ uint16_t wifi_http_get_request(char *url) {
   // Set recv state to expect a HTTP response, hopefully before WIFI module
   // gives a response.
   wifi_recv_state = recv_http_response;
+
+  // TODO: Implement a timeout here to prevent hanging up forever.
   while (!wifi_at_response_ready)
     ;
 

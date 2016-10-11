@@ -47,8 +47,7 @@ int main(void) {
   wifi_send_string("AT+S.SCFG=wifi_priv_mode,2\r");
   wifi_send_string("AT+S.SCFG=wifi_mode,1\r");
   wifi_send_string("AT+S.SCFG=ip_use_dhcp,1\r");
-  wifi_send_string("AT&W\r");  // Write settings
-  wifi_send_string("AT+S.FSL\r");
+  wifi_send_string("AT&W\r");       // Write settings
   wifi_send_string("AT+CFUN=0\r");  // Reset wifi module
 
   printf("Entering main loop!\n");
