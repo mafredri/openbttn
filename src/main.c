@@ -36,19 +36,29 @@ int main(void) {
 
   printf("\nBootup complete!\n");
 
-  delay(500);
+  // Show blue light until WIFI is ready.
+  leds_shift(0xff0000);
 
-  // TODO: Wait for console ready from WIFI module.
-  wifi_send_string("AT&F\r");                       // Factory reset
-  wifi_send_string("AT+S.SCFG=console1_hwfc,0\r");  // Hardware flow control
-                                                    // does not seem to work.
-  wifi_send_string("AT+S.SSIDTXT=MY_SSID\r");
-  wifi_send_string("AT+S.SCFG=wifi_wpa_psk_text,MY_PASSWORD\r");
-  wifi_send_string("AT+S.SCFG=wifi_priv_mode,2\r");
-  wifi_send_string("AT+S.SCFG=wifi_mode,1\r");
-  wifi_send_string("AT+S.SCFG=ip_use_dhcp,1\r");
-  wifi_send_string("AT&W\r");       // Write settings
-  wifi_send_string("AT+CFUN=0\r");  // Reset wifi module
+  wifi_wait_state(WIFI_STATE_CONSOLE_ACTIVE);
+  printf("Configuring WIFI module...\n");
+
+  wifi_at_command_blocking("AT&F");  // Factory reset
+  wifi_at_command_blocking(
+      "AT+S.SCFG=console1_hwfc,0");  // Hardware flow control
+                                     // does not seem to work.
+  wifi_at_command_blocking("AT+S.SSIDTXT=MY_SSID");
+  wifi_at_command_blocking("AT+S.SCFG=wifi_wpa_psk_text,MY_PASSWORD");
+  wifi_at_command_blocking("AT+S.SCFG=wifi_priv_mode,2");
+  wifi_at_command_blocking("AT+S.SCFG=wifi_mode,1");
+  wifi_at_command_blocking("AT+S.SCFG=ip_use_dhcp,1");
+  wifi_at_command_blocking("AT&W");  // Write settings
+  wifi_soft_reset();
+
+  printf("Waiting for WIFI UP...\n");
+  wifi_wait_state(WIFI_STATE_WIFI_UP);
+
+  // WIFI is up, power off leds.
+  leds_shift(0);
 
   printf("Entering main loop!\n");
 

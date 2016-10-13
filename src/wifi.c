@@ -8,10 +8,22 @@
 uint8_t wifi_rb_space[RING_BUFF_SIZE];
 ring_buffer_t wifi_rb = {wifi_rb_space, 0, 0, 0};
 
-uint8_t tmp_process_buffer[1024];
-uint8_t http_buffer[WIFI_BUFF_SIZE];
+volatile uint32_t wifi_state = WIFI_STATE_OFF;
+static uint8_t tmp_buffer[1024];
+static uint8_t http_buffer[WIFI_BUFF_SIZE];
 volatile bool wifi_at_response_ready = false;
+volatile bool wifi_at_response_ok = false;
 volatile bool wifi_http_data_available = false;
+
+typedef enum {
+  wind_console_active = 0,    // Console active, can accept AT commands.
+  wind_power_on = 1,          // Power on (also after reset).
+  wind_reset = 2,             // Module will reset.
+  wind_wifi_join = 19,        // Join BSSID (AP MAC).
+  wind_wifi_up = 24,          // Connected with IP.
+  wind_wifi_associated = 25,  // Successfull association with SSID.
+  wind_undefined = 255,       // Unknown state.
+} wifi_wind_t;
 
 typedef enum {
   recv_async_indication = 0,
@@ -22,6 +34,7 @@ typedef enum {
 static wifi_recv_t wifi_recv_state = recv_async_indication;
 
 void wifi_process_buffer(uint8_t data);
+void wifi_process_wind(uint8_t *const buff_ptr);
 
 static void wifi_gpio_setup(void);
 static void wifi_usart_setup(void);
@@ -40,10 +53,22 @@ void wifi_off(void) {
   gpio_clear(GPIOB, GPIO2);  // Power off Wifi module.
 }
 
-void wifi_reset(void) {
+// wifi_soft_reset executes the AT+CFUN command, issuing a reset, and waits for
+// the power on indication from the WIFI module.
+void wifi_soft_reset(void) {
+  // Unset the power on state so that we can wait for it.
+  wifi_state &= ~(WIFI_STATE_POWER_ON);
+
+  wifi_at_command("AT+CFUN=1");  // Reset wifi module
+  wifi_wait_state(WIFI_STATE_POWER_ON);
+}
+
+void wifi_hard_reset(void) {
   wifi_off();
+  wifi_state = WIFI_STATE_OFF;
   delay(1000);
   wifi_on();
+  wifi_wait_state(WIFI_STATE_POWER_ON);
 }
 
 static void wifi_gpio_setup(void) {
@@ -124,59 +149,57 @@ void WIFI_isr(void) {
 void wifi_process_buffer(uint8_t data) {
   static uint16_t buff_pos = 0, http_pos = 0;
   static bool http_error = false;
-  static bool begin = false;
+  static bool resp_start = false;
   static uint8_t prev_data = '\0';
 
-  tmp_process_buffer[(buff_pos++) & 1023] = data;
+  tmp_buffer[(buff_pos++) & 1023] = data;
 
   switch (wifi_recv_state) {
     case recv_async_indication:
       // The beginning and the end of an asynchronous indication is marked by
       // "\r\n".
       if (prev_data == '\r' && data == '\n') {
-        if (begin) {
-          // TODO: Handle asynchronous indication by parsing it and changing
-          // wifi state based on it.
-          // Handle at least:
-          // +WIND:1:Poweron
-          // +WIND:0:Console active
-          // +WIND:24:WiFi Up
-          usart_send_blocking(DEBUG_USART, '=');
+        if (resp_start) {
+          usart_send_blocking(DEBUG_USART, '+');
           usart_send_blocking(DEBUG_USART, '>');
-          uint16_t i = 0;
-          if (tmp_process_buffer[2] == '+') {  // Indication starts with "+".
-            i = 2;
-          }
+          uint16_t i = 2;
           for (; i < buff_pos; i++) {
-            usart_send_blocking(DEBUG_USART, tmp_process_buffer[i]);
+            usart_send_blocking(DEBUG_USART, tmp_buffer[i]);
           }
 
+          wifi_process_wind(&tmp_buffer[0]);
+
           buff_pos = 0;
-          memset(&tmp_process_buffer, 0, 1024);
-          begin = false;
+          memset(&tmp_buffer, 0, 1024);
+          resp_start = false;
         } else {
-          begin = true;
+          resp_start = true;
         }
       }
       break;
     case recv_at_repsonse:
       if (prev_data == '\r' && data == '\n') {
-        if (begin) {
-          // TODO: Handle OK / ERROR status.
-          usart_send_blocking(DEBUG_USART, '?');
+        if (resp_start) {
+          usart_send_blocking(DEBUG_USART, '=');
           usart_send_blocking(DEBUG_USART, '>');
           uint16_t i = 2;
           for (; i < buff_pos; i++) {
-            usart_send_blocking(DEBUG_USART, tmp_process_buffer[i]);
+            usart_send_blocking(DEBUG_USART, tmp_buffer[i]);
+          }
+
+          if (strstr((const char *)&tmp_buffer, "\r\nOK\r\n")) {
+            wifi_at_response_ok = true;
+          } else {
+            wifi_at_response_ok = false;
           }
 
           buff_pos = 0;
-          memset(&tmp_process_buffer, 0, 1024);
+          memset(&tmp_buffer, 0, 1024);
           wifi_recv_state = recv_async_indication;
           wifi_at_response_ready = true;
-          begin = false;
+          resp_start = false;
         } else {
-          begin = true;
+          resp_start = true;
         }
       }
       break;
@@ -210,7 +233,7 @@ void wifi_process_buffer(uint8_t data) {
         http_error = false;
         http_pos = 0;
         buff_pos = 0;
-        memset(&tmp_process_buffer, 0, 1024);
+        memset(&tmp_buffer, 0, 1024);
         wifi_recv_state = recv_async_indication;
         wifi_at_response_ready = true;
       }
@@ -224,6 +247,80 @@ void wifi_process_buffer(uint8_t data) {
   prev_data = data;
 }
 
+// wifi_process_wind consumes a buffer containing a WIND (WIFI indication) and
+// updates the wifi_state if an appropraite WIND is found.
+void wifi_process_wind(uint8_t *const buff_ptr) {
+  wifi_wind_t n = wind_undefined;
+  char *wind_ptr;
+
+  wind_ptr = strstr((const char *)buff_ptr, "+WIND:");
+  if (wind_ptr) {
+    wind_ptr += 6;  // Skip over "+WIND:", next char is a digit.
+
+    // We assume the WIND is never greater than 99 (two digits).
+    n = *wind_ptr++ - '0';  // Convert char to int
+    if (*wind_ptr != ':') {
+      n *= 10;               // First digit was a multiple of 10
+      n += *wind_ptr - '0';  // Convert char to int
+    }
+  }
+
+  switch (n) {
+    case wind_console_active:
+      wifi_state |= WIFI_STATE_CONSOLE_ACTIVE;
+      break;
+    case wind_power_on:
+      // Reset WIFI state after power on.
+      wifi_state = WIFI_STATE_POWER_ON;
+      break;
+    case wind_reset:
+      wifi_state = WIFI_STATE_RESET;
+      break;
+    case wind_wifi_associated:
+      break;
+    case wind_wifi_join:
+      break;
+    case wind_wifi_up:
+      wifi_state |= WIFI_STATE_WIFI_UP;
+      break;
+    case wind_undefined:
+      printf("Could not process WIND\n");
+      break;
+  }
+}
+
+// wifi_wait_state waits until the WIFI module is in specified state.
+void wifi_wait_state(wifi_state_t state) {
+  while ((wifi_state & state) == 0)
+    ;
+}
+
+// wifi_at_command sends an AT command to the WIFI module without blocking, the
+// result is ignored.
+void wifi_at_command(char *str) {
+  wifi_wait_state(WIFI_STATE_CONSOLE_ACTIVE);
+  wifi_send_string(str);
+  wifi_send_string("\r");
+}
+
+// wifi_at_command_blocking sends an AT command to the WIFI module and blocks
+// until it receives an OK or ERROR status. Returns true on OK and false on
+// error.
+bool wifi_at_command_blocking(char *str) {
+  wifi_wait_state(WIFI_STATE_CONSOLE_ACTIVE);
+  wifi_at_response_ready = false;
+  wifi_send_string(str);
+  wifi_send_string("\r");
+  wifi_recv_state = recv_at_repsonse;
+
+  while (!wifi_at_response_ready)
+    ;
+
+  return wifi_at_response_ok;
+}
+
+// wifi_http_get_request performs a blocking HTTP GET request and returns the
+// http status code returned by the server.
 uint16_t wifi_http_get_request(char *url) {
   wifi_at_response_ready = false;
   wifi_http_data_available = false;
