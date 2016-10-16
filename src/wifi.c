@@ -6,6 +6,7 @@
 
 #include <libopencmsis/core_cm3.h>
 
+#include "util.h"
 #include "wifi.h"
 
 // wifi_rb is the ring buffer that receives all incoming data from the WIFI
@@ -296,14 +297,18 @@ bool wifi_process_bttn_indication(uint8_t *const buff_ptr) {
     // We assume the indication ID is never greater than 99 (two digits).
     n = *bttn_ptr++ - '0';  // Convert char to int
     if (*bttn_ptr != ':') {
-      n *= 10;               // First digit was a multiple of 10
-      n += *bttn_ptr - '0';  // Convert char to int
+      n *= 10;                 // First digit was a multiple of 10
+      n += *bttn_ptr++ - '0';  // Convert char to int
     }
+
+    bttn_ptr++;  // Skip over ':', leaving message.
   }
 
+  char url[80];
   switch (n) {
     case bttn_set_url1:
-      printf("Set URL1!\n");
+      url_decode(&url[0], bttn_ptr);
+      printf("Set URL1 to %s!\n", &url[0]);
       break;
     case bttn_undefined:
       return false;
