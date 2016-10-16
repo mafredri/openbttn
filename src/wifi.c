@@ -1,43 +1,43 @@
+#include <assert.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <libopencmsis/core_cm3.h>
+
 #include "wifi.h"
 
+// wifi_rb is the ring buffer that receives all incoming data from the WIFI
+// module, data is written to it during an interrupt on the USART and read from
+// it in the wifi sys tick handler.
 uint8_t wifi_rb_space[RING_BUFF_SIZE];
 ring_buffer_t wifi_rb = {wifi_rb_space, 0, 0, 0};
 
-volatile uint32_t wifi_state = WIFI_STATE_OFF;
-static uint8_t tmp_buffer[1024];
-static uint8_t http_buffer[WIFI_BUFF_SIZE];
-volatile bool wifi_at_response_ready = false;
-volatile bool wifi_at_response_ok = false;
-volatile bool wifi_http_data_available = false;
+// tmp_buffer is used to process WIND from the WIFI module.
+uint8_t tmp_buffer[WIFI_TMP_BUFF_SIZE];
 
-typedef enum {
-  wind_console_active = 0,    // Console active, can accept AT commands.
-  wind_power_on = 1,          // Power on (also after reset).
-  wind_reset = 2,             // Module will reset.
-  wind_wifi_join = 19,        // Join BSSID (AP MAC).
-  wind_wifi_up = 24,          // Connected with IP.
-  wind_wifi_associated = 25,  // Successfull association with SSID.
-  wind_undefined = 255,       // Unknown state.
-} wifi_wind_t;
+// wifi_at_state is the global state for the current AT command, state will be
+// reset before executing a new AT command.
+uint8_t at_buff_space[WIFI_AT_BUFF_SIZE];
+wifi_at_t wifi_at_state = {AT_STATUS_CLEAR, &at_buff_space[0], 0, 0};
 
-typedef enum {
-  recv_async_indication = 0,
-  recv_at_repsonse,
-  recv_http_response,
-} wifi_recv_t;
+// wifi_state tracks the current state of the WIFI module.
+volatile wifi_state_t wifi_state = WIFI_STATE_OFF;
 
+// wifi_recv_state tracks the expected response type from the WIFI module, it is
+// used to decide what kind of processing is done on the response.
 static wifi_recv_t wifi_recv_state = recv_async_indication;
-
-void wifi_process_buffer(uint8_t data);
-void wifi_process_wind(uint8_t *const buff_ptr);
 
 static void wifi_gpio_setup(void);
 static void wifi_usart_setup(void);
+
+static void wifi_debug_print_buff(uint8_t *const buff, uint8_t prefix);
+bool wifi_process_wind_response(wifi_state_t *state, uint8_t *const buff,
+                                uint8_t data);
+void wifi_process_wind_id(wifi_state_t *state, uint8_t *const buff_ptr);
+bool wifi_process_at_response(wifi_at_t *at, uint8_t data);
+uint16_t wifi_http_parse_status(uint8_t *response);
 
 void wifi_init(void) {
   wifi_gpio_setup();
@@ -56,10 +56,13 @@ void wifi_off(void) {
 // wifi_soft_reset executes the AT+CFUN command, issuing a reset, and waits for
 // the power on indication from the WIFI module.
 void wifi_soft_reset(void) {
+  // We must wait for the console to be active.
+  wifi_wait_state(WIFI_STATE_CONSOLE_ACTIVE);
+
   // Unset the power on state so that we can wait for it.
   wifi_state &= ~(WIFI_STATE_POWER_ON);
 
-  wifi_at_command("AT+CFUN=1");  // Reset wifi module
+  wifi_send_string("AT+CFUN=1\r");  // Reset wifi module.
   wifi_wait_state(WIFI_STATE_POWER_ON);
 }
 
@@ -113,23 +116,45 @@ void wifi_send_string(char *str) {
   }
 }
 
-// wifi_sys_tick_handler consumes the wifi ring buffer and sends it for
-// processesing by the wifi_process_buffer function.
-// TODO: Only process all ring buffer data when we are receiving a HTTP
-// response.
+// wifi_sys_tick_handler consumes the wifi ring buffer and processes it
+// according to the current wifi_recv_state. Only one char is processed per
+// tick, except when AT_STATUS_FAST_PROCESS is enabled.
 void wifi_sys_tick_handler(void) {
+  bool status;
   uint8_t data;
 
+process_loop:
+  // Temporarily disable interrupts, ring buffer is not thread safe.
   __disable_irq();
   data = ring_buffer_pop(&wifi_rb);
   __enable_irq();
 
-  while (data != '\0') {
-    wifi_process_buffer(data);
-
-    __disable_irq();
-    data = ring_buffer_pop(&wifi_rb);
-    __enable_irq();
+  if (data != '\0') {
+    switch (wifi_recv_state) {
+      // Asynchronous indications can happen at any point except when an AT
+      // command is processing, this is the default wifi_recv_state.
+      case recv_async_indication:
+        status = wifi_process_wind_response(&wifi_state, &tmp_buffer[0], data);
+        if (status == WIFI_PROCESS_COMPLETE) {
+          memset(&tmp_buffer[0], 0, WIFI_TMP_BUFF_SIZE);
+        }
+        break;
+      // AT command responses only happen after an AT command has been issued,
+      // some only return OK / ERROR whereas others have a response body, ending
+      // with OK / ERROR.
+      case recv_at_response:
+        status = wifi_process_at_response(&wifi_at_state, data);
+        if (status == WIFI_PROCESS_COMPLETE) {
+          wifi_recv_state = recv_async_indication;
+        } else if ((wifi_at_state.status & AT_STATUS_FAST_PROCESS) != 0) {
+          goto process_loop;
+        }
+        break;
+      // Unhandled recv state.
+      default:
+        printf("Unknown wifi_recv_state\n");
+        break;
+    }
   }
 }
 
@@ -140,116 +165,75 @@ void WIFI_isr(void) {
   if (usart_get_flag(WIFI_USART, USART_SR_RXNE)) {
     data = usart_recv(WIFI_USART);
 
+    // Temporarily disable interrupts, ring buffer is not thread safe.
     __disable_irq();
     ring_buffer_push(&wifi_rb, data);
     __enable_irq();
   }
 }
 
-void wifi_process_buffer(uint8_t data) {
-  static uint16_t buff_pos = 0, http_pos = 0;
-  static bool http_error = false;
-  static bool resp_start = false;
-  static uint8_t prev_data = '\0';
+// wifi_process_wind_response processes WIND from the WIFI module, if it is a
+// valid WIND the WIFI module state is updated.
+bool wifi_process_wind_response(wifi_state_t *state, uint8_t *const buff,
+                                uint8_t data) {
+  static uint16_t pos = 0;
+  static uint8_t prev = '\0';
 
-  tmp_buffer[(buff_pos++) & 1023] = data;
+  buff[pos++] = data;
 
-  switch (wifi_recv_state) {
-    case recv_async_indication:
-      // The beginning and the end of an asynchronous indication is marked by
-      // "\r\n".
-      if (prev_data == '\r' && data == '\n') {
-        if (resp_start) {
-          usart_send_blocking(DEBUG_USART, '+');
-          usart_send_blocking(DEBUG_USART, '>');
-          uint16_t i = 2;
-          for (; i < buff_pos; i++) {
-            usart_send_blocking(DEBUG_USART, tmp_buffer[i]);
-          }
+  // The beginning and the end of an asynchronous indication is marked by
+  // "\r\n", by skipping the first two chars we look for pairs of "\r\n".
+  if (pos > 2 && prev == '\r' && data == '\n') {
+    wifi_debug_print_buff(buff, '+');
+    wifi_process_wind_id(state, buff);
 
-          wifi_process_wind(&tmp_buffer[0]);
-
-          buff_pos = 0;
-          memset(&tmp_buffer, 0, 1024);
-          resp_start = false;
-        } else {
-          resp_start = true;
-        }
-      }
-      break;
-    case recv_at_repsonse:
-      if (prev_data == '\r' && data == '\n') {
-        if (resp_start) {
-          usart_send_blocking(DEBUG_USART, '=');
-          usart_send_blocking(DEBUG_USART, '>');
-          uint16_t i = 2;
-          for (; i < buff_pos; i++) {
-            usart_send_blocking(DEBUG_USART, tmp_buffer[i]);
-          }
-
-          if (strstr((const char *)&tmp_buffer, "\r\nOK\r\n")) {
-            wifi_at_response_ok = true;
-          } else {
-            wifi_at_response_ok = false;
-          }
-
-          buff_pos = 0;
-          memset(&tmp_buffer, 0, 1024);
-          wifi_recv_state = recv_async_indication;
-          wifi_at_response_ready = true;
-          resp_start = false;
-        } else {
-          resp_start = true;
-        }
-      }
-      break;
-    case recv_http_response:
-      // This buffer will contain both the entire HTTP response and the AT
-      // command response.
-      http_buffer[http_pos++] = data;
-
-      // Do not perform unecessary parsing until enough data is received.
-      if (http_pos < 6) {
-        break;
-      }
-
-      bool http_response_received = false;
-
-      if (strstr((const char *)&http_buffer[http_pos - 6], "\r\nOK\r\n")) {
-        http_response_received = true;
-        wifi_http_data_available = true;
-      } else if (http_error && strstr((const char *)&http_buffer[http_pos - 2],
-                                      "\r\n")) {  // End of error received.
-        http_response_received = true;
-        wifi_http_data_available = false;
-      } else if (strstr((const char *)&http_buffer[http_pos - 7],
-                        "\r\nERROR")) {  // Beginning of error message.
-
-        http_error = true;
-      }
-
-      // Cleanup after complete response.
-      if (http_response_received) {
-        http_error = false;
-        http_pos = 0;
-        buff_pos = 0;
-        memset(&tmp_buffer, 0, 1024);
-        wifi_recv_state = recv_async_indication;
-        wifi_at_response_ready = true;
-      }
-
-      break;
-    default:
-      printf("Unknown wifi state\n");
-      break;
+    pos = 0;
+    prev = '\0';
+    return WIFI_PROCESS_COMPLETE;
   }
 
-  prev_data = data;
+  prev = data;
+  return WIFI_PROCESS_INCOMPLETE;
 }
 
-// wifi_process_wind consumes a buffer containing a WIND (WIFI indication) and
-// updates the wifi_state if an appropraite WIND is found.
-void wifi_process_wind(uint8_t *const buff_ptr) {
+// wifi_process_at_response processes the data in the provided at buffer and
+// indicates whether or not the entire response has been received, the AT status
+// is updated accordingly.
+bool wifi_process_at_response(wifi_at_t *at, uint8_t data) {
+  at->buff[at->pos++] = data;
+
+  // A response must always end at a "\r\n", by skipping len under the minimum
+  // response length we avoid unecessary processing in the beginning.
+  if (data == '\n' && at->buff[at->pos - 2] == '\r') {
+    if (at->last_cr_lf != 0) {
+      // Check for AT OK response (end), indicating a successfull HTTP request.
+      if (strstr((const char *)at->last_cr_lf, "\r\nOK\r\n")) {
+        wifi_debug_print_buff(at->buff, '#');
+        at->status = AT_STATUS_OK | AT_STATUS_READY;
+
+        return WIFI_PROCESS_COMPLETE;
+      }
+
+      // Check for AT error response (end), indicating there was an error. We
+      // check from last_cr_lf to ensure we get the full error message.
+      if (strstr((const char *)at->last_cr_lf, "\r\nERROR")) {
+        wifi_debug_print_buff(at->buff, '!');
+        at->status = AT_STATUS_ERROR | AT_STATUS_READY;
+
+        return WIFI_PROCESS_COMPLETE;
+      }
+    }
+
+    // Keep track of the current "\r\n" position.
+    at->last_cr_lf = &at->buff[at->pos - 2];
+  }
+
+  return WIFI_PROCESS_INCOMPLETE;
+}
+
+// wifi_process_wind_id consumes a buffer containing WIND and updates the state
+// if a handled WIND ID is found.
+void wifi_process_wind_id(wifi_state_t *state, uint8_t *const buff_ptr) {
   wifi_wind_t n = wind_undefined;
   char *wind_ptr;
 
@@ -267,24 +251,26 @@ void wifi_process_wind(uint8_t *const buff_ptr) {
 
   switch (n) {
     case wind_console_active:
-      wifi_state |= WIFI_STATE_CONSOLE_ACTIVE;
+      *state |= WIFI_STATE_CONSOLE_ACTIVE;
       break;
     case wind_power_on:
       // Reset WIFI state after power on.
-      wifi_state = WIFI_STATE_POWER_ON;
+      *state = WIFI_STATE_POWER_ON;
       break;
     case wind_reset:
-      wifi_state = WIFI_STATE_RESET;
+      *state = WIFI_STATE_OFF;
       break;
     case wind_wifi_associated:
+      *state |= WIFI_STATE_ASSOCIATED;
       break;
-    case wind_wifi_join:
+    case wind_wifi_joined:
+      *state |= WIFI_STATE_JOINED;
       break;
     case wind_wifi_up:
-      wifi_state |= WIFI_STATE_WIFI_UP;
+      *state |= WIFI_STATE_UP;
       break;
     case wind_undefined:
-      printf("Could not process WIND\n");
+      printf("ERROR: Could not process WIND\n");
       break;
   }
 }
@@ -295,62 +281,118 @@ void wifi_wait_state(wifi_state_t state) {
     ;
 }
 
+// wifi_at_clear resets the AT command state.
+void wifi_at_clear(wifi_at_t *at) {
+  memset(at->buff, 0, at->pos);
+  at->status = AT_STATUS_CLEAR;
+  at->last_cr_lf = 0;
+  at->pos = 0;
+}
+
+// wifi_at_command_wait waits until we recieve the entire AT response and
+// returns true if there was no error, otherwise false.
+bool wifi_at_command_wait(void) {
+  while ((wifi_at_state.status & AT_STATUS_READY) == 0)
+    ;
+
+  return (wifi_at_state.status & AT_STATUS_ERROR) == 0;
+}
+
 // wifi_at_command sends an AT command to the WIFI module without blocking, the
-// result is ignored.
+// response will still be available in the AT buffer once it is received.
 void wifi_at_command(char *str) {
   wifi_wait_state(WIFI_STATE_CONSOLE_ACTIVE);
+  wifi_at_clear(&wifi_at_state);
+
   wifi_send_string(str);
   wifi_send_string("\r");
+
+  wifi_recv_state = recv_at_response;
 }
 
 // wifi_at_command_blocking sends an AT command to the WIFI module and blocks
 // until it receives an OK or ERROR status. Returns true on OK and false on
-// error.
+// ERROR.
 bool wifi_at_command_blocking(char *str) {
-  wifi_wait_state(WIFI_STATE_CONSOLE_ACTIVE);
-  wifi_at_response_ready = false;
-  wifi_send_string(str);
-  wifi_send_string("\r");
-  wifi_recv_state = recv_at_repsonse;
-
-  while (!wifi_at_response_ready)
-    ;
-
-  return wifi_at_response_ok;
+  wifi_at_command(str);
+  return wifi_at_command_wait();
 }
 
 // wifi_http_get_request performs a blocking HTTP GET request and returns the
 // http status code returned by the server.
 uint16_t wifi_http_get_request(char *url) {
-  wifi_at_response_ready = false;
-  wifi_http_data_available = false;
-  memset(&http_buffer, 0, 1024);
+  char req[80];  // TODO: What's the limit???
 
-  wifi_send_string("AT+S.HTTPGET=");
-  wifi_send_string(url);
-  wifi_send_string("\r");
-  // Set recv state to expect a HTTP response, hopefully before WIFI module
-  // gives a response.
-  wifi_recv_state = recv_http_response;
+  sprintf(&req[0], "AT+S.HTTPGET=%s", url);
+  wifi_at_command(&req[0]);
+  // We use fast processing here to quickly receive the response.
+  wifi_at_state.status |= AT_STATUS_FAST_PROCESS;
+  wifi_at_command_wait();
 
-  // TODO: Implement a timeout here to prevent hanging up forever.
-  while (!wifi_at_response_ready)
-    ;
+  if ((wifi_at_state.status & AT_STATUS_OK) != 0) {
+    return wifi_http_parse_status(wifi_at_state.buff);
+  } else {
+    return 0;
+  }
+}
 
-  uint16_t http_status_code = 0;
+// wifi_http_parse_status takes a http response buffer and tries to parse the
+// status code from the http header, zero is returned when no status is found.
+uint16_t wifi_http_parse_status(uint8_t *response) {
+  uint16_t status = 0;
+  char status_str[3];
+  char *header_ptr;
 
-  if (wifi_http_data_available) {
-    char status_str[3];
-    char *header_ptr;
-
-    header_ptr = strstr((const char *)&http_buffer[0], "HTTP/1.");
-    if (header_ptr) {
-      // The status code is the 9th-11th element of the header.
-      // Example: "HTTP/1.0 200 OK"
-      memcpy(&status_str, (header_ptr + 9), 3);
-      http_status_code = atoi(&status_str[0]);
-    }
+  header_ptr = strstr((const char *)response, "HTTP/1.");
+  if (header_ptr) {
+    // The status code is the 9th-11th element of the header.
+    // Example: "HTTP/1.0 200 OK"
+    memcpy(&status_str, (header_ptr + 9), 3);
+    status = atoi(&status_str[0]);
   }
 
-  return http_status_code;
+  return status;
+}
+
+void wifi_get_ssid(char *dest, size_t len) {
+  int i;
+  char *s;
+
+  assert(len >= 32);
+
+  wifi_at_command_blocking("AT+S.GCFG=wifi_ssid");
+
+  s = strstr((const char *)wifi_at_state.buff, "#  wifi_ssid = ");
+  if (s) {
+    s += 15;
+    for (i = 0; i < 32 && isxdigit(*s); i++) {  // Max lenght is 32
+      dest[i] = strtol(s, &s, 16);
+      if (*s == ':') {
+        s++;
+      }
+    }
+  }
+}
+
+static void wifi_debug_print_buff(uint8_t *const buff, uint8_t prefix) {
+  uint8_t *ptr = &buff[0];
+
+  usart_send_blocking(DEBUG_USART, prefix);
+  usart_send_blocking(DEBUG_USART, '>');
+
+  while (*ptr) {
+    if (*ptr == '\r') {
+      usart_send_blocking(DEBUG_USART, '\\');
+      usart_send_blocking(DEBUG_USART, 'r');
+    } else if (*ptr == '\n') {
+      usart_send_blocking(DEBUG_USART, '\\');
+      usart_send_blocking(DEBUG_USART, 'n');
+    } else {
+      usart_send_blocking(DEBUG_USART, *ptr);
+    }
+    ptr++;
+  }
+
+  usart_send_blocking(DEBUG_USART, '\r');
+  usart_send_blocking(DEBUG_USART, '\n');
 }

@@ -42,20 +42,30 @@ int main(void) {
   wifi_wait_state(WIFI_STATE_CONSOLE_ACTIVE);
   printf("Configuring WIFI module...\n");
 
-  wifi_at_command_blocking("AT&F");  // Factory reset
-  wifi_at_command_blocking(
-      "AT+S.SCFG=console1_hwfc,0");  // Hardware flow control
-                                     // does not seem to work.
-  wifi_at_command_blocking("AT+S.SSIDTXT=MY_SSID");
-  wifi_at_command_blocking("AT+S.SCFG=wifi_wpa_psk_text,MY_PASSWORD");
-  wifi_at_command_blocking("AT+S.SCFG=wifi_priv_mode,2");
-  wifi_at_command_blocking("AT+S.SCFG=wifi_mode,1");
-  wifi_at_command_blocking("AT+S.SCFG=ip_use_dhcp,1");
-  wifi_at_command_blocking("AT&W");  // Write settings
-  wifi_soft_reset();
+  char ssid[32];
+  wifi_get_ssid(&ssid[0], sizeof(ssid));
+  printf("SSID: %s\n", ssid);
+
+  if (strcmp(&ssid, "MY_SSID") != 0) {
+    wifi_at_command_blocking("AT&F");  // Factory reset
+
+    wifi_at_command_blocking("AT+S.SCFG=console1_hwfc,0");  // Hardware flow
+                                                            // control does not
+                                                            // seem to work.
+    wifi_at_command_blocking(
+        "AT+S.SCFG=console1_errs,2");  // Display error codes.
+    wifi_at_command_blocking("AT+S.SSIDTXT=MY_SSID");
+    wifi_at_command_blocking("AT+S.SCFG=wifi_wpa_psk_text,MY_PASSWORD");
+    wifi_at_command_blocking("AT+S.SCFG=wifi_priv_mode,2");
+    wifi_at_command_blocking("AT+S.SCFG=wifi_mode,1");
+    wifi_at_command_blocking("AT+S.SCFG=ip_use_dhcp,1");
+    wifi_at_command_blocking("AT+S.SCFG=ip_use_decoder,2");
+    wifi_at_command_blocking("AT&W");  // Write settings
+    wifi_soft_reset();
+  }
 
   printf("Waiting for WIFI UP...\n");
-  wifi_wait_state(WIFI_STATE_WIFI_UP);
+  wifi_wait_state(WIFI_STATE_UP);
 
   // WIFI is up, power off leds.
   leds_shift(0);
@@ -65,7 +75,7 @@ int main(void) {
   uint16_t http_status = 0;
   while (1) {
     if (button_pressed) {
-      http_status = wifi_http_get_request("192.168.0.10,/test,8080");
+      http_status = wifi_http_get_request("192.168.0.10,/test,8774");
       if (http_status >= 400) {
         leds_shift(0x0000ff);
       } else if (http_status >= 100) {
