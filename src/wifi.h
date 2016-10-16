@@ -34,6 +34,7 @@ typedef struct {
   uint16_t pos;
 } wifi_at_t;
 
+// WIND IDs as handled by the application.
 typedef enum {
   wind_console_active = 0,    // Console active, can accept AT commands.
   wind_power_on = 1,          // Power on (also after reset).
@@ -41,8 +42,14 @@ typedef enum {
   wind_wifi_joined = 19,      // Join BSSID (AP MAC).
   wind_wifi_up = 24,          // Connected with IP.
   wind_wifi_associated = 25,  // Successfull association with SSID.
-  wind_undefined = 255,       // Unknown state.
+  wind_undefined = 0xFF,      // Undefined state.
 } wifi_wind_t;
+
+// Custom messages for the openbttn firmware.
+typedef enum {
+  bttn_set_url1 = 0,      // Set URL1 message.
+  bttn_undefined = 0xFF,  // Undefined message.
+} wifi_bttn_t;
 
 typedef enum {
   recv_async_indication = 0,

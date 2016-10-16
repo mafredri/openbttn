@@ -33,9 +33,9 @@ static void wifi_gpio_setup(void);
 static void wifi_usart_setup(void);
 
 static void wifi_debug_print_buff(uint8_t *const buff, uint8_t prefix);
-bool wifi_process_wind_response(wifi_state_t *state, uint8_t *const buff,
-                                uint8_t data);
-void wifi_process_wind_id(wifi_state_t *state, uint8_t *const buff_ptr);
+bool wifi_process_async_response(uint8_t *const buff, uint8_t data);
+bool wifi_process_wind(wifi_state_t *state, uint8_t *const buff_ptr);
+bool wifi_process_bttn_indication(uint8_t *const buff);
 bool wifi_process_at_response(wifi_at_t *at, uint8_t data);
 uint16_t wifi_http_parse_status(uint8_t *response);
 
@@ -134,10 +134,18 @@ process_loop:
       // Asynchronous indications can happen at any point except when an AT
       // command is processing, this is the default wifi_recv_state.
       case recv_async_indication:
-        status = wifi_process_wind_response(&wifi_state, &tmp_buffer[0], data);
+        status = wifi_process_async_response(&tmp_buffer[0], data);
+
         if (status == WIFI_PROCESS_COMPLETE) {
+          bool is_wind = wifi_process_wind(&wifi_state, &tmp_buffer[0]);
+
+          if (!is_wind && !wifi_process_bttn_indication(&tmp_buffer[0])) {
+            printf("Could not process async response\n");
+          }
+
           memset(&tmp_buffer[0], 0, WIFI_TMP_BUFF_SIZE);
         }
+
         break;
       // AT command responses only happen after an AT command has been issued,
       // some only return OK / ERROR whereas others have a response body, ending
@@ -172,10 +180,9 @@ void WIFI_isr(void) {
   }
 }
 
-// wifi_process_wind_response processes WIND from the WIFI module, if it is a
-// valid WIND the WIFI module state is updated.
-bool wifi_process_wind_response(wifi_state_t *state, uint8_t *const buff,
-                                uint8_t data) {
+// wifi_process_async_response any asynchronous communication from the WIFI
+// module, indicating whenever a response is ready to be processed.
+bool wifi_process_async_response(uint8_t *const buff, uint8_t data) {
   static uint16_t pos = 0;
   static uint8_t prev = '\0';
 
@@ -185,7 +192,6 @@ bool wifi_process_wind_response(wifi_state_t *state, uint8_t *const buff,
   // "\r\n", by skipping the first two chars we look for pairs of "\r\n".
   if (pos > 2 && prev == '\r' && data == '\n') {
     wifi_debug_print_buff(buff, '+');
-    wifi_process_wind_id(state, buff);
 
     pos = 0;
     prev = '\0';
@@ -231,9 +237,9 @@ bool wifi_process_at_response(wifi_at_t *at, uint8_t data) {
   return WIFI_PROCESS_INCOMPLETE;
 }
 
-// wifi_process_wind_id consumes a buffer containing WIND and updates the state
-// if a handled WIND ID is found.
-void wifi_process_wind_id(wifi_state_t *state, uint8_t *const buff_ptr) {
+// wifi_process_wind consumes a buffer containing WIND and updates the state if
+// a handled WIND ID is found.
+bool wifi_process_wind(wifi_state_t *state, uint8_t *const buff_ptr) {
   wifi_wind_t n = wind_undefined;
   char *wind_ptr;
 
@@ -241,7 +247,7 @@ void wifi_process_wind_id(wifi_state_t *state, uint8_t *const buff_ptr) {
   if (wind_ptr) {
     wind_ptr += 6;  // Skip over "+WIND:", next char is a digit.
 
-    // We assume the WIND is never greater than 99 (two digits).
+    // We assume the indication ID is never greater than 99 (two digits).
     n = *wind_ptr++ - '0';  // Convert char to int
     if (*wind_ptr != ':') {
       n *= 10;               // First digit was a multiple of 10
@@ -250,15 +256,15 @@ void wifi_process_wind_id(wifi_state_t *state, uint8_t *const buff_ptr) {
   }
 
   switch (n) {
-    case wind_console_active:
-      *state |= WIFI_STATE_CONSOLE_ACTIVE;
-      break;
     case wind_power_on:
       // Reset WIFI state after power on.
       *state = WIFI_STATE_POWER_ON;
       break;
     case wind_reset:
       *state = WIFI_STATE_OFF;
+      break;
+    case wind_console_active:
+      *state |= WIFI_STATE_CONSOLE_ACTIVE;
       break;
     case wind_wifi_associated:
       *state |= WIFI_STATE_ASSOCIATED;
@@ -270,9 +276,41 @@ void wifi_process_wind_id(wifi_state_t *state, uint8_t *const buff_ptr) {
       *state |= WIFI_STATE_UP;
       break;
     case wind_undefined:
-      printf("ERROR: Could not process WIND\n");
+      return false;
       break;
   }
+
+  return true;
+}
+
+// wifi_process_bttn_indication consumes a buffer containing BTTN and allows for
+// remote controlling of the bttn.
+bool wifi_process_bttn_indication(uint8_t *const buff_ptr) {
+  wifi_bttn_t n = bttn_undefined;
+  char *bttn_ptr;
+
+  bttn_ptr = strstr((const char *)buff_ptr, "+BTTN:");
+  if (bttn_ptr) {
+    bttn_ptr += 6;  // Skip over "+BTTN:", next char is a digit.
+
+    // We assume the indication ID is never greater than 99 (two digits).
+    n = *bttn_ptr++ - '0';  // Convert char to int
+    if (*bttn_ptr != ':') {
+      n *= 10;               // First digit was a multiple of 10
+      n += *bttn_ptr - '0';  // Convert char to int
+    }
+  }
+
+  switch (n) {
+    case bttn_set_url1:
+      printf("Set URL1!\n");
+      break;
+    case bttn_undefined:
+      return false;
+      break;
+  }
+
+  return true;
 }
 
 // wifi_wait_state waits until the WIFI module is in specified state.

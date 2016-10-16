@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "button.h"
 #include "debug.h"
@@ -46,7 +47,7 @@ int main(void) {
   wifi_get_ssid(&ssid[0], sizeof(ssid));
   printf("SSID: %s\n", ssid);
 
-  if (strcmp(&ssid, "MY_SSID") != 0) {
+  if (strcmp(&ssid[0], "MY_SSID") != 0) {
     wifi_at_command_blocking("AT&F");  // Factory reset
 
     wifi_at_command_blocking("AT+S.SCFG=console1_hwfc,0");  // Hardware flow
