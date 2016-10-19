@@ -1,0 +1,6 @@
+{
+  "devDependencies": {
+    "html-inline": "^1.2.0",
+    "uglify-js": "github:mishoo/UglifyJS2#harmony"
+  }
+}
