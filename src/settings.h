@@ -9,12 +9,13 @@ typedef struct ConfigData {
 } ConfigData;
 
 typedef enum ConfigType {
-  conf_url1,
-  conf_url2,
+  CONF_URL1,
+  CONF_URL2,
 } ConfigType;
 
 typedef struct Config {
-  volatile bool commit, updated;
+  volatile bool commit;
+  volatile bool updated;
   ConfigData* data;
 } Config;
 extern Config config;

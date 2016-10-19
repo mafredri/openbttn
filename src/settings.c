@@ -44,11 +44,11 @@ void conf_Load(Config* c) {
 
 void conf_Set(Config* c, ConfigType type, void* value) {
   switch (type) {
-    case conf_url1:
+    case CONF_URL1:
       memcpy(c->data->url1, (char*)value, URL_LENGTH);
       c->updated = true;
       break;
-    case conf_url2:
+    case CONF_URL2:
       memcpy(c->data->url2, (char*)value, URL_LENGTH);
       c->updated = true;
       break;

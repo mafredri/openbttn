@@ -316,13 +316,13 @@ bool wifi_process_cind(Config *c, uint8_t *const buff_ptr) {
       memset(&text[0], 0, 120);
       url_decode(&text[0], cind_ptr, URL_LENGTH);
       printf("Set URL1 to %s!\n", &text[0]);
-      conf_Set(c, conf_url1, &text[0]);
+      conf_Set(c, CONF_URL1, &text[0]);
       break;
     case cind_bttn_set_url2:
       memset(&text[0], 0, 120);
       url_decode(&text[0], cind_ptr, URL_LENGTH);
       printf("Set URL2 to %s!\n", &text[0]);
-      conf_Set(c, conf_url2, &text[0]);
+      conf_Set(c, CONF_URL2, &text[0]);
       break;
     case cind_undefined:
       return false;
