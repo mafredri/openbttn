@@ -1,7 +1,10 @@
 #ifndef WIFI_H
 #define WIFI_H
 
+#include <ctype.h>
+
 #include "ring_buffer.h"
+#include "settings.h"
 #include "syscfg.h"
 
 #define WIFI_TMP_BUFF_SIZE 512  // Used for WIND (WIFI indication).
@@ -47,9 +50,11 @@ typedef enum {
 
 // Custom messages for the openbttn firmware.
 typedef enum {
-  bttn_set_url1 = 0,      // Set URL1 message.
-  bttn_undefined = 0xFF,  // Undefined message.
-} wifi_bttn_t;
+  cind_bttn_commit_config = 0,  // Commit configuration changes to EEPROM.
+  cind_bttn_set_url1 = 1,       // Set URL1 message.
+  cind_bttn_set_url2 = 2,       // Set URL2 message.
+  cind_undefined = 0xFF,        // Undefined message.
+} wifi_cind;
 
 typedef enum {
   recv_async_indication = 0,
@@ -66,7 +71,7 @@ void wifi_on(void);
 void wifi_off(void);
 void wifi_soft_reset(void);
 void wifi_hard_reset(void);
-void wifi_send_string(char *str);
+void wifi_send_string(const char *str);
 
 void wifi_wait_state(wifi_state_t state);
 void wifi_at_command(char *str);
@@ -74,6 +79,7 @@ bool wifi_at_command_blocking(char *str);
 uint16_t wifi_http_get_request(char *url);
 void wifi_get_ssid(char *dest, size_t len);
 
-extern ring_buffer_t wifi_buffer;
+void wifi_CreateOpenBTTNPage(void);
+void wifi_StoreConfigJSON(ConfigData *data);
 
 #endif /* WIFI_H */

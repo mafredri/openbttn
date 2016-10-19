@@ -25,6 +25,8 @@
 #define BUTTON_isr exti15_10_isr
 #define BUTTON_NVIC NVIC_EXTI15_10_IRQ
 
+#define URL_LENGTH 100
+
 #define RCC_WIFI_USART RCC_USART3
 #define WIFI_GPIO_PORT GPIOB
 #define WIFI_USART USART3

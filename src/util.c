@@ -4,12 +4,12 @@
 
 #include "util.h"
 
-int url_decode(char *dest, const char *src) {
+int url_decode(char *dest, const char *src, int len) {
   char c;
   const char *end = src + strlen(src);
   char *dPtr;
 
-  for (dPtr = dest; src <= end; dPtr++) {
+  for (dPtr = dest; src <= end && len--; dPtr++) {
     c = *src++;
     if (c == '\r' || c == '\n') {
       c = '\0';

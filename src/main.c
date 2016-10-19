@@ -4,6 +4,7 @@
 #include "button.h"
 #include "debug.h"
 #include "led.h"
+#include "settings.h"
 #include "syscfg.h"
 #include "wifi.h"
 
@@ -43,6 +44,10 @@ int main(void) {
   wifi_wait_state(WIFI_STATE_CONSOLE_ACTIVE);
   printf("Configuring WIFI module...\n");
 
+  conf_Load(&config);
+  wifi_CreateOpenBTTNPage();
+  wifi_StoreConfigJSON(config.data);
+
   char ssid[32];
   wifi_get_ssid(&ssid[0], sizeof(ssid));
   printf("SSID: %s\n", ssid);
@@ -75,6 +80,8 @@ int main(void) {
 
   uint16_t http_status = 0;
   while (1) {
+    conf_HandleChange(&config);
+
     if (button_pressed) {
       http_status = wifi_http_get_request("192.168.0.10,/test,8774");
       if (http_status >= 400) {
