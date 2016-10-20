@@ -2,9 +2,9 @@
 #include <string.h>
 
 #include "button.h"
+#include "conf.h"
 #include "debug.h"
 #include "led.h"
-#include "settings.h"
 #include "syscfg.h"
 #include "wifi.h"
 
@@ -29,7 +29,7 @@ int main(void) {
   delay(50);
 
   debug_init();
-  wifi_init();
+  wifi_Init();
 
   button_enable();
 
@@ -41,7 +41,7 @@ int main(void) {
   // Show blue light until WIFI is ready.
   leds_shift(0xff0000);
 
-  wifi_wait_state(WIFI_STATE_CONSOLE_ACTIVE);
+  spwf_WaitState(SPWF_STATE_CONSOLE_ACTIVE);
   printf("Configuring WIFI module...\n");
 
   conf_Load(&config);
@@ -53,25 +53,24 @@ int main(void) {
   printf("SSID: %s\n", ssid);
 
   if (strcmp(&ssid[0], "MY_SSID") != 0) {
-    wifi_at_command_blocking("AT&F");  // Factory reset
+    spwf_ATCmdBlocking("AT&F");  // Factory reset
 
-    wifi_at_command_blocking("AT+S.SCFG=console1_hwfc,0");  // Hardware flow
-                                                            // control does not
-                                                            // seem to work.
-    wifi_at_command_blocking(
-        "AT+S.SCFG=console1_errs,2");  // Display error codes.
-    wifi_at_command_blocking("AT+S.SSIDTXT=MY_SSID");
-    wifi_at_command_blocking("AT+S.SCFG=wifi_wpa_psk_text,MY_PASSWORD");
-    wifi_at_command_blocking("AT+S.SCFG=wifi_priv_mode,2");
-    wifi_at_command_blocking("AT+S.SCFG=wifi_mode,1");
-    wifi_at_command_blocking("AT+S.SCFG=ip_use_dhcp,1");
-    wifi_at_command_blocking("AT+S.SCFG=ip_use_decoder,2");
-    wifi_at_command_blocking("AT&W");  // Write settings
-    wifi_soft_reset();
+    spwf_ATCmdBlocking("AT+S.SCFG=console1_hwfc,0");  // Hardware flow
+                                                      // control does not
+                                                      // seem to work.
+    spwf_ATCmdBlocking("AT+S.SCFG=console1_errs,2");  // Display error codes.
+    spwf_ATCmdBlocking("AT+S.SSIDTXT=MY_SSID");
+    spwf_ATCmdBlocking("AT+S.SCFG=wifi_wpa_psk_text,MY_PASSWORD");
+    spwf_ATCmdBlocking("AT+S.SCFG=wifi_priv_mode,2");
+    spwf_ATCmdBlocking("AT+S.SCFG=wifi_mode,1");
+    spwf_ATCmdBlocking("AT+S.SCFG=ip_use_dhcp,1");
+    spwf_ATCmdBlocking("AT+S.SCFG=ip_use_decoder,2");
+    spwf_ATCmdBlocking("AT&W");  // Write settings
+    spwf_SoftReset();
   }
 
   printf("Waiting for WIFI UP...\n");
-  wifi_wait_state(WIFI_STATE_UP);
+  spwf_WaitState(SPWF_STATE_UP);
 
   // WIFI is up, power off leds.
   leds_shift(0);

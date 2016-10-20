@@ -5,12 +5,13 @@
 
 #include <libopencm3/stm32/flash.h>
 
-#include "settings.h"
+#include "conf.h"
 #include "wifi.h"
 
+// We allocate 1024 bytes as configuration space in EEPROM. The maximum size is
+// 4096 (end addess 0x08080FFF).
 #define DATA_EEPROM_START_ADDR 0x08080000
-#define DATA_EEPROM_END_ADDR \
-  0x080803FF  // We allocate 1024 bytes for settings, 4096 is max (0x08080FFF).
+#define DATA_EEPROM_END_ADDR 0x080803FF
 #define WORD_SIZE 4
 #define DATA_MAX_LEN \
   (DATA_EEPROM_END_ADDR - DATA_EEPROM_START_ADDR + 1) / WORD_SIZE
@@ -42,7 +43,7 @@ void conf_Load(Config* c) {
   eeprom_read(DATA_EEPROM_START_ADDR, c->data, sizeof(*c->data) / WORD_SIZE);
 }
 
-void conf_Set(Config* c, ConfigType type, void* value) {
+void conf_Set(Config* c, ConfigType type, const void* value) {
   switch (type) {
     case CONF_URL1:
       memcpy(c->data->url1, (char*)value, URL_LENGTH);

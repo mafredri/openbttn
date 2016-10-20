@@ -22,7 +22,7 @@ extern Config config;
 
 void conf_Commit(Config* c);
 void conf_Load(Config* c);
-void conf_Set(Config* c, ConfigType type, void* value);
+void conf_Set(Config* c, ConfigType type, const void* value);
 void conf_RequestCommit(Config* c);
 void conf_HandleChange(Config* c);
 

@@ -10,9 +10,8 @@ static void debug_usart_setup(void);
 
 // Implement _write for newlib(-nano)
 int _write(int file, char *ptr, int len) {
-  int i;
-
   if (file == STDOUT_FILENO || file == STDERR_FILENO) {
+    int i;
     for (i = 0; i < len; i++) {
       if (ptr[i] == '\n') {
         usart_send_blocking(DEBUG_USART, '\r');
