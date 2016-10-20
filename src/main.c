@@ -49,7 +49,7 @@ int main(void) {
   wifi_StoreConfigJSON(config.data);
 
   char ssid[32];
-  wifi_get_ssid(&ssid[0], sizeof(ssid));
+  wifi_GetSSID(&ssid[0], sizeof(ssid));
   printf("SSID: %s\n", ssid);
 
   if (strcmp(&ssid[0], "MY_SSID") != 0) {
@@ -77,21 +77,21 @@ int main(void) {
 
   printf("Entering main loop!\n");
 
-  uint16_t http_status = 0;
+  uint16_t httpStatus = 0;
   while (1) {
     conf_HandleChange(&config);
 
     if (button_pressed) {
-      http_status = wifi_http_get_request("192.168.0.10,/test,8774");
-      if (http_status >= 400) {
+      httpStatus = wifi_HTTPGet(&config.data->url1[0]);
+      if (httpStatus >= 400) {
         leds_shift(0x0000ff);
-      } else if (http_status >= 100) {
+      } else if (httpStatus >= 100) {
         leds_shift(0x00ff00);
       } else {
         leds_shift(0xffffff);
       }
 
-      printf("HTTP %d\n", http_status);
+      printf("HTTP %d\n", httpStatus);
 
       delay(2000);
       leds_shift(0);

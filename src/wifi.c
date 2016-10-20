@@ -17,67 +17,31 @@ ring_buffer_t wifi_rb = {wifi_rb_space, 0, 0, 0};
 // tmp_buffer is used to process WIND from the WIFI module.
 uint8_t tmp_buffer[WIFI_TMP_BUFF_SIZE];
 
-// spwf_at_state is the global state for the current AT command, state will be
-// reset before executing a new AT command.
-uint8_t at_buff_space[WIFI_AT_BUFF_SIZE];
-ATState spwf_at_state = {AT_STATUS_CLEAR, &at_buff_space[0], 0, 0};
-
-// spwf_state tracks the current state of the WIFI module.
-volatile SpwfState spwf_state = SPWF_STATE_OFF;
-
-// spwf_recv_state tracks the expected response type from the WIFI module, it is
-// used to decide what kind of processing is done on the response.
-static RecvType spwf_recv_state = RECV_ASYNC_INDICATION;
-
 static void wifi_SetupGPIO(void);
 static void wifi_SetupUSART(void);
 
-bool spwf_ProcessAsyncIndication(uint8_t *const buff, uint8_t data);
-bool spwf_ProcessWIND(SpwfState *state, uint8_t *const buff_ptr);
 bool wifi_ProcessCIND(Config *c, uint8_t *const buff);
-bool spwf_ProcessATResponse(ATState *at, uint8_t data);
-uint16_t wifi_http_parse_status(uint8_t *response);
-static void spwf_DebugPrintBuffer(uint8_t *const buff, uint8_t prefix);
+static uint16_t httpStatus(uint8_t *response);
 
 unsigned char index_html[];
 unsigned int index_html_len;
 unsigned char json_header[];
 
+// wifi_Init boots the WIFI module.
 void wifi_Init(void) {
   wifi_SetupGPIO();
   wifi_SetupUSART();
-  spwf_PowerOn();
+  spwf_Init();
 }
 
-void spwf_PowerOn(void) {
-  gpio_set(GPIOB, GPIO2);  // Power on Wifi module.
-}
+// Implement SPWF01SX hardware communication functions.
+void spwfDelay(uint32_t ms) { delay(ms); }
+void spwf_PowerOn(void) { gpio_set(GPIOB, GPIO2); }
+void spwf_PowerOff(void) { gpio_clear(GPIOB, GPIO2); }
+void spwf_Send(char data) { usart_send_blocking(WIFI_USART, data); }
+void spwf_DebugSend(char data) { usart_send_blocking(DEBUG_USART, data); }
 
-void spwf_PowerOff(void) {
-  gpio_clear(GPIOB, GPIO2);  // Power off Wifi module.
-}
-
-// spwf_SoftReset executes the AT+CFUN command, issuing a reset, and waits for
-// the power on indication from the WIFI module.
-void spwf_SoftReset(void) {
-  // We must wait for the console to be active.
-  spwf_WaitState(SPWF_STATE_CONSOLE_ACTIVE);
-
-  // Unset the power on state so that we can wait for it.
-  spwf_state &= ~(SPWF_STATE_POWER_ON);
-
-  spwf_SendString("AT+CFUN=1\r");  // Reset wifi module.
-  spwf_WaitState(SPWF_STATE_POWER_ON);
-}
-
-void spwf_HardReset(void) {
-  spwf_PowerOff();
-  spwf_state = SPWF_STATE_OFF;
-  delay(1000);
-  spwf_PowerOn();
-  spwf_WaitState(SPWF_STATE_POWER_ON);
-}
-
+// wifi_SetupGPIO configures the GPIOs for settings up the USART.
 static void wifi_SetupGPIO(void) {
   rcc_periph_clock_enable(RCC_WIFI_USART);
 
@@ -93,6 +57,7 @@ static void wifi_SetupGPIO(void) {
   gpio_set_af(WIFI_GPIO_PORT, GPIO_AF7, WIFI_GPIO_RX);
 }
 
+// wifi_SetupUSART configures the USART for communicating with the WIFI module.
 static void wifi_SetupUSART(void) {
   usart_set_baudrate(WIFI_USART, 115200);
   usart_set_databits(WIFI_USART, 8);
@@ -114,15 +79,9 @@ static void wifi_SetupUSART(void) {
   usart_enable(WIFI_USART);
 }
 
-void spwf_SendString(const char *str) {
-  while (*str) {
-    usart_send_blocking(WIFI_USART, *str++);
-  }
-}
-
-// wifi_SysTickHandler consumes the wifi ring buffer and processes it
-// according to the current spwf_recv_state. Only one char is processed per
-// tick, except when AT_STATUS_FAST_PROCESS is enabled.
+// wifi_SysTickHandler consumes the wifi ring buffer and processes it according
+// to the current spwf_RecvState. Only one char is processed per tick, except
+// when AT_STATUS_FAST_PROCESS is enabled.
 void wifi_SysTickHandler(void) {
   uint8_t data;
   bool status;
@@ -134,14 +93,14 @@ process_loop:
   __enable_irq();
 
   if (data != '\0') {
-    switch (spwf_recv_state) {
+    switch (spwf_RecvState) {
       // Asynchronous indications can happen at any point except when an AT
-      // command is processing, this is the default spwf_recv_state.
+      // command is processing, this is the default spwf_RecvState.
       case RECV_ASYNC_INDICATION:
         status = spwf_ProcessAsyncIndication(&tmp_buffer[0], data);
 
         if (status == SPWF_PROCESS_COMPLETE) {
-          bool is_wind = spwf_ProcessWIND(&spwf_state, &tmp_buffer[0]);
+          bool is_wind = spwf_ProcessWIND(&spwf_State, &tmp_buffer[0]);
 
           if (!is_wind && !wifi_ProcessCIND(&config, &tmp_buffer[0])) {
             printf("Could not process asynchronous indication\n");
@@ -155,24 +114,24 @@ process_loop:
       // some only return OK / ERROR whereas others have a response body, ending
       // with OK / ERROR.
       case RECV_AT_RESPONSE:
-        status = spwf_ProcessATResponse(&spwf_at_state, data);
+        status = spwf_ProcessATResponse(&spwf_ATState, data);
         if (status == SPWF_PROCESS_COMPLETE) {
-          spwf_recv_state = RECV_ASYNC_INDICATION;
-        } else if ((spwf_at_state.status & AT_STATUS_FAST_PROCESS) != 0) {
+          spwf_RecvState = RECV_ASYNC_INDICATION;
+        } else if ((spwf_ATState.status & AT_STATUS_FAST_PROCESS) != 0) {
           goto process_loop;
         }
         break;
       // Unhandled recv state.
       default:
-        printf("Unknown spwf_recv_state\n");
+        printf("Unknown spwf_RecvState\n");
         break;
     }
   }
 }
 
-// WIFI_isr handles interrupts from the WIFI module and stores the data in a
+// WIFI_ISR handles interrupts from the WIFI module and stores the data in a
 // ring buffer.
-void WIFI_isr(void) {
+void WIFI_ISR(void) {
   if (usart_get_flag(WIFI_USART, USART_SR_RXNE)) {
     uint8_t data;
     data = usart_recv(WIFI_USART);
@@ -182,109 +141,6 @@ void WIFI_isr(void) {
     ring_buffer_push(&wifi_rb, data);
     __enable_irq();
   }
-}
-
-// spwf_ProcessAsyncIndication any asynchronous communication from the WIFI
-// module, indicating whenever a response is ready to be processed.
-bool spwf_ProcessAsyncIndication(uint8_t *const buff, uint8_t data) {
-  static uint16_t pos = 0;
-  static uint8_t prev = '\0';
-
-  buff[pos++] = data;
-
-  // The beginning and the end of an asynchronous indication is marked by
-  // "\r\n", by skipping the first two chars we look for pairs of "\r\n".
-  if (pos > 2 && prev == '\r' && data == '\n') {
-    spwf_DebugPrintBuffer(buff, '+');
-
-    pos = 0;
-    prev = '\0';
-    return SPWF_PROCESS_COMPLETE;
-  }
-
-  prev = data;
-  return WIFI_PROCESS_INCOMPLETE;
-}
-
-// spwf_ProcessATResponse processes the data in the provided at buffer and
-// indicates whether or not the entire response has been received, the AT status
-// is updated accordingly.
-bool spwf_ProcessATResponse(ATState *at, uint8_t data) {
-  at->buff[at->pos++] = data;
-
-  // A response must always end at a "\r\n", by skipping len under the minimum
-  // response length we avoid unecessary processing in the beginning.
-  if (data == '\n' && at->buff[at->pos - 2] == '\r') {
-    if (at->last_cr_lf != 0) {
-      // Check for AT OK response (end), indicating a successfull HTTP request.
-      if (strstr((const char *)at->last_cr_lf, "\r\nOK\r\n")) {
-        spwf_DebugPrintBuffer(at->buff, '#');
-        at->status = AT_STATUS_OK | AT_STATUS_READY;
-
-        return SPWF_PROCESS_COMPLETE;
-      }
-
-      // Check for AT error response (end), indicating there was an error. We
-      // check from last_cr_lf to ensure we get the full error message.
-      if (strstr((const char *)at->last_cr_lf, "\r\nERROR")) {
-        spwf_DebugPrintBuffer(at->buff, '!');
-        at->status = AT_STATUS_ERROR | AT_STATUS_READY;
-
-        return SPWF_PROCESS_COMPLETE;
-      }
-    }
-
-    // Keep track of the current "\r\n" position.
-    at->last_cr_lf = &at->buff[at->pos - 2];
-  }
-
-  return WIFI_PROCESS_INCOMPLETE;
-}
-
-// spwf_ProcessWIND consumes a buffer containing WIND and updates the state if
-// a handled WIND ID is found.
-bool spwf_ProcessWIND(SpwfState *state, uint8_t *const buff_ptr) {
-  WINDType n = WIND_UNDEFINED;
-  char *wind_ptr;
-
-  wind_ptr = strstr((const char *)buff_ptr, "+WIND:");
-  if (wind_ptr) {
-    wind_ptr += 6;  // Skip over "+WIND:", next char is a digit.
-
-    // We assume the indication ID is never greater than 99 (two digits).
-    n = *wind_ptr++ - '0';  // Convert char to int
-    if (*wind_ptr != ':') {
-      n *= 10;               // First digit was a multiple of 10
-      n += *wind_ptr - '0';  // Convert char to int
-    }
-  }
-
-  switch (n) {
-    case WIND_POWER_ON:
-      // Reset WIFI state after power on.
-      *state = SPWF_STATE_POWER_ON;
-      break;
-    case WIND_RESET:
-      *state = SPWF_STATE_OFF;
-      break;
-    case WIND_CONSOLE_ACTIVE:
-      *state |= SPWF_STATE_CONSOLE_ACTIVE;
-      break;
-    case WIND_WIFI_ASSOCIATED:
-      *state |= SPWF_STATE_ASSOCIATED;
-      break;
-    case WIND_WIFI_JOINED:
-      *state |= SPWF_STATE_JOINED;
-      break;
-    case WIND_WIFI_UP:
-      *state |= SPWF_STATE_UP;
-      break;
-    case WIND_UNDEFINED:
-      return false;
-      break;
-  }
-
-  return true;
 }
 
 // wifi_ProcessCIND consumes a buffer containing CIND (custom indication) and
@@ -332,75 +188,31 @@ bool wifi_ProcessCIND(Config *c, uint8_t *const buff_ptr) {
   return true;
 }
 
-// spwf_WaitState waits until the WIFI module is in specified state.
-void spwf_WaitState(SpwfState state) {
-  while ((spwf_state & state) == 0)
-    ;
-}
-
-// spwf_ATReset resets the AT command state.
-void spwf_ATReset(ATState *at) {
-  memset(at->buff, 0, at->pos);
-  at->status = AT_STATUS_CLEAR;
-  at->last_cr_lf = 0;
-  at->pos = 0;
-}
-
-// spwf_ATCmdWait waits until we recieve the entire AT response and
-// returns true if there was no error, otherwise false.
-bool spwf_ATCmdWait(void) {
-  while ((spwf_at_state.status & AT_STATUS_READY) == 0)
-    ;
-
-  return (spwf_at_state.status & AT_STATUS_ERROR) == 0;
-}
-
-// spwf_ATCmd sends an AT command to the WIFI module without blocking, the
-// response will still be available in the AT buffer once it is received.
-void spwf_ATCmd(char *str) {
-  spwf_WaitState(SPWF_STATE_CONSOLE_ACTIVE);
-  spwf_ATReset(&spwf_at_state);
-
-  spwf_SendString(str);
-
-  // Change the recv type before sending the final "\r" to prevent potential
-  // race conditions. This works because sending "A" is blocking and the WIFI
-  // module queues all asynchronous indications.
-  spwf_recv_state = RECV_AT_RESPONSE;
-
-  spwf_SendString("\r");
-}
-
-// spwf_ATCmdBlocking sends an AT command to the WIFI module and blocks until
-// it receives an OK or ERROR status. Returns true on OK and false on ERROR.
-bool spwf_ATCmdBlocking(char *str) {
-  spwf_ATCmd(str);
-  return spwf_ATCmdWait();
-}
-
-// wifi_http_get_request performs a blocking HTTP GET request and returns the
-// http status code returned by the server.
-uint16_t wifi_http_get_request(char *url) {
+// wifi_HTTPGet performs a blocking HTTP GET request and returns the http status
+// code returned by the server.
+uint16_t wifi_HTTPGet(char *url) {
   char req[URL_LENGTH];
 
   assert(strlen(url) <= URL_LENGTH);
 
   sprintf(&req[0], "AT+S.HTTPGET=%s", url);
   spwf_ATCmd(&req[0]);
+
   // We use fast processing here to quickly receive the response.
-  spwf_at_state.status |= AT_STATUS_FAST_PROCESS;
+  spwf_ATState.status |= AT_STATUS_FAST_PROCESS;
+
   spwf_ATCmdWait();
 
-  if ((spwf_at_state.status & AT_STATUS_OK) != 0) {
-    return wifi_http_parse_status(spwf_at_state.buff);
+  if ((spwf_ATState.status & AT_STATUS_OK) != 0) {
+    return httpStatus(spwf_ATState.buff);
   } else {
     return 0;
   }
 }
 
-// wifi_http_parse_status takes a http response buffer and tries to parse the
+// httpStatus takes a http response buffer and tries to parse the
 // status code from the http header, zero is returned when no status is found.
-uint16_t wifi_http_parse_status(uint8_t *response) {
+static uint16_t httpStatus(uint8_t *response) {
   uint16_t status = 0;
   char status_str[3];
   char *header_ptr;
@@ -416,14 +228,14 @@ uint16_t wifi_http_parse_status(uint8_t *response) {
   return status;
 }
 
-void wifi_get_ssid(char *dest, size_t len) {
+void wifi_GetSSID(char *dest, size_t len) {
   char *s;
 
   assert(len >= 32);
 
   spwf_ATCmdBlocking("AT+S.GCFG=wifi_ssid");
 
-  s = strstr((const char *)spwf_at_state.buff, "#  wifi_ssid = ");
+  s = strstr((const char *)spwf_ATState.buff, "#  wifi_ssid = ");
   if (s) {
     s += 15;  // Skip over "#  wifi_ssid = ".
     int i;
@@ -483,29 +295,6 @@ void wifi_StoreConfigJSON(ConfigData *data) {
   spwf_SendString("\"}");
 
   spwf_ATCmdWait();  // Wait for file to be created.
-}
-
-static void spwf_DebugPrintBuffer(uint8_t *const buff, uint8_t prefix) {
-  uint8_t *ptr = &buff[0];
-
-  usart_send_blocking(DEBUG_USART, prefix);
-  usart_send_blocking(DEBUG_USART, '>');
-
-  while (*ptr) {
-    if (*ptr == '\r') {
-      usart_send_blocking(DEBUG_USART, '\\');
-      usart_send_blocking(DEBUG_USART, 'r');
-    } else if (*ptr == '\n') {
-      usart_send_blocking(DEBUG_USART, '\\');
-      usart_send_blocking(DEBUG_USART, 'n');
-    } else {
-      usart_send_blocking(DEBUG_USART, *ptr);
-    }
-    ptr++;
-  }
-
-  usart_send_blocking(DEBUG_USART, '\r');
-  usart_send_blocking(DEBUG_USART, '\n');
 }
 
 unsigned char index_html[] = {

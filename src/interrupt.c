@@ -9,7 +9,7 @@ void sys_tick_handler(void) {
     system_delay--;
   }
 
-  wifi_sys_tick_handler();
+  wifi_SysTickHandler();
 }
 
 void nmi_handler(void) {
