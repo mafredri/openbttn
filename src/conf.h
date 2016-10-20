@@ -4,8 +4,8 @@
 #include "syscfg.h"
 
 typedef struct ConfigData {
-  unsigned char url1[URL_LENGTH];
-  unsigned char url2[URL_LENGTH];
+  char url1[URL_LENGTH];
+  char url2[URL_LENGTH];
 } ConfigData;
 
 typedef enum ConfigType {

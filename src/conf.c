@@ -46,10 +46,12 @@ void conf_Load(Config* c) {
 void conf_Set(Config* c, ConfigType type, const void* value) {
   switch (type) {
     case CONF_URL1:
+      memset(c->data->url1, 0, URL_LENGTH);
       memcpy(c->data->url1, (char*)value, URL_LENGTH);
       c->updated = true;
       break;
     case CONF_URL2:
+      memset(c->data->url2, 0, URL_LENGTH);
       memcpy(c->data->url2, (char*)value, URL_LENGTH);
       c->updated = true;
       break;
@@ -60,14 +62,21 @@ void conf_Set(Config* c, ConfigType type, const void* value) {
 
 void conf_RequestCommit(Config* c) { c->commit = true; }
 
+// conf_HandleChange handles changes to the config and must be run periodically
+// to make sure changes are persisted.
 void conf_HandleChange(Config* c) {
   if (c->updated) {
-    delay(1000);
-    wifi_StoreConfigJSON(c->data);
     c->updated = false;
+    delay(500);         // Debounce time.
+    if (!c->updated) {  // No update in 500ms.
+      wifi_StoreConfigJSON(c->data);
+    }
   }
   if (c->commit) {
-    conf_Commit(c);
     c->commit = false;
+    delay(500);        // Debounce time.
+    if (!c->commit) {  // No commit in 500ms.
+      conf_Commit(c);
+    }
   }
 }
