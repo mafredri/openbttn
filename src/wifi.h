@@ -21,7 +21,7 @@
 #define WIFI_TMP_BUFF_SIZE 1024  // Used for WIND (WIFI indication).
 #endif
 #ifndef WIFI_AT_BUFF_SIZE
-#define WIFI_AT_BUFF_SIZE (1024 * 4)  // Used for AT / HTTP responses.
+#define WIFI_AT_BUFF_SIZE (1024)  // Used for AT / HTTP responses.
 #endif
 
 #define WIFI_STATE_OFF (uint16_t)(0)
@@ -138,7 +138,7 @@ void wifi_Send(char data);
 void wifi_SendString(const char *str);
 uint16_t wifi_HttpGet(char *url);
 void wifi_GetSsid(char *dest, size_t len);
-void wifi_EnableFirstConfig(void);
+void wifi_EnableFirstConfig(const char *ssid, const char *password);
 void wifi_CreateFileInRam(const char *name, const char *contentType,
                           const char *data, uint16_t contentLength);
 void wifi_ApplyConfig(void);

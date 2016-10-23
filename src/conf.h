@@ -13,16 +13,17 @@
 typedef struct ConfigData {
   char url1[CONF_URL_LENGTH + 1];
   char url2[CONF_URL_LENGTH + 1];
+  char password[CONF_PASSWORD_LENGTH + 1];
 } __attribute__((__packed__)) ConfigData;
 
 typedef enum ConfigType {
   CONF_URL1,
   CONF_URL2,
+  CONF_PASSWORD,
 } ConfigType;
 
 typedef struct Config {
   ConfigData* data;
-  char password[CONF_PASSWORD_LENGTH + 1];
   volatile bool unlocked;
   volatile bool commit;
   volatile bool updated;
@@ -34,6 +35,7 @@ void conf_Load(void);
 void conf_Unlock(const char* value);
 bool conf_IsUnlocked(void);
 void* conf_Get(ConfigType type);
+void conf_SetTempPassword(const char* password);
 void conf_Set(ConfigType type, const void* value);
 void conf_RequestCommit(void);
 void conf_CreateConfigJson(void);

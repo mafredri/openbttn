@@ -59,7 +59,7 @@ void conf_Load(void) {
 void conf_Unlock(const char* value) {
   Config* config = &g_Config;
 
-  if (strncmp(&config->password[0], value, CONF_PASSWORD_LENGTH) == 0) {
+  if (strncmp(&config->data->password[0], value, CONF_PASSWORD_LENGTH) == 0) {
     config->unlocked = true;
     printf("Config unlocked!\n");
   } else {
@@ -80,12 +80,21 @@ void* conf_Get(ConfigType type) {
       return &config->data->url1[0];
     case CONF_URL2:
       return &config->data->url2[0];
+    case CONF_PASSWORD:
+      return &config->data->password[0];
     default:
       printf("Unhandled config type!\n");
       break;
   }
 
   return 0;
+}
+
+void conf_SetTempPassword(const char* password) {
+  Config* config = &g_Config;
+
+  memset(config->data->password, 0, CONF_PASSWORD_LENGTH);
+  strncpy(config->data->password, password, CONF_PASSWORD_LENGTH);
 }
 
 void conf_Set(ConfigType type, const void* value) {
@@ -106,6 +115,12 @@ void conf_Set(ConfigType type, const void* value) {
       memset(config->data->url2, 0, CONF_URL_LENGTH);
       strncpy(config->data->url2, (char*)value, CONF_URL_LENGTH);
       config->updated = true;
+      break;
+    case CONF_PASSWORD:
+      memset(config->data->password, 0, CONF_PASSWORD_LENGTH);
+      strncpy(config->data->password, (char*)value, CONF_PASSWORD_LENGTH);
+      config->updated = true;
+      config->commit = true;  // Always commit a password change.
       break;
     default:
       printf("Unhandled config type!\n");

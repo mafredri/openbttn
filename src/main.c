@@ -40,17 +40,24 @@ int main(void) {
 
   printf("\nBootup complete!\n");
 
-  if (g_ButtonPressed) {
+  conf_Init();
+
+  if (g_ButtonPressed || gpio_get(BUTTON_GPIO_PORT, BUTTON_PIN_IT)) {
     led_TickConfigure(500, &led_TickHandlerRecovery);
     led_TickEnable();
 
-    wifi_EnableFirstConfig();
+    conf_SetTempPassword("openbttn1337");
+    wifi_EnableFirstConfig("openbttn", "openbttn1337");
+    wifi_WaitState(WIFI_STATE_UP);
     wifi_CreateFileInRam("firstset.html", "text/html",
                          (char *)&g_DataFirstsetHtml[0],
                          DATA_FIRSTSET_HTML_LENGTH);
+
     // TODO: Escape!
-    while (1)
-      ;
+    while (1) {
+      conf_HandleChange();
+      wifi_HandleChange();
+    }
 
     led_TickDisable();
   } else {
@@ -58,17 +65,12 @@ int main(void) {
     leds_shift(0xff0000);
   }
 
-  wifi_WaitState(WIFI_STATE_CONSOLE_ACTIVE);
-  printf("Configuring WIFI module...\n");
-
-  conf_Init();
-
-  printf("Waiting for WIFI UP...\n");
-  wifi_WaitState(WIFI_STATE_UP);
-
   wifi_CreateFileInRam("index.html", "text/html", (char *)&g_DataIndexHtml[0],
                        DATA_INDEX_HTML_LENGTH);
   conf_CreateConfigJson();
+
+  printf("Waiting for WIFI UP...\n");
+  wifi_WaitState(WIFI_STATE_UP);
 
   // WIFI is up, power off leds.
   leds_shift(0);

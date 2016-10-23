@@ -139,7 +139,7 @@ void wifi_HandleChange(void) {
 
 // atReset resets the AT command state.
 static void atReset(WifiAtType *at) {
-  memset(at->buff, 0, at->pos);
+  memset(at->buff, 0, WIFI_AT_BUFF_SIZE);
   at->status = AT_STATUS_CLEAR;
   at->last_cr_lf = 0;
   at->pos = 0;
@@ -241,6 +241,7 @@ void wifi_CreateFileInRam(const char *name, const char *contentType,
                           const char *data, uint16_t len) {
   char header[strlen(httpFileHeader) + 20 + 4 + 1];
   char fileSizeStr[5 + 1];
+  uint16_t i;
   uint16_t fileSize;
 
   assert(strlen(contentType) <= 20);
@@ -263,16 +264,32 @@ void wifi_CreateFileInRam(const char *name, const char *contentType,
 
   // Append all contents to file.
   wifi_AtCmdN(3, "AT+S.FSA=/", name, &fileSizeStr[0]);
-  wifi_SendString(header);
-  wifi_SendString(data);
+  for (i = 0; i < strlen(header); i++) {
+    wifi_Send(header[i]);
+  }
+  for (i = 0; i < len; i++) {
+    wifi_Send(data[i]);
+  }
+
   wifi_AtCmdWait();
 }
 
-void wifi_EnableFirstConfig(void) {
+void wifi_EnableFirstConfig(const char *ssid, const char *password) {
   wifi_AtCmdBlocking("AT&F");
-  wifi_AtCmdBlocking("AT+S.SSIDTXT=openbttn");
+  wifi_AtCmdN(2, "AT+S.SSIDTXT=", ssid);
+  wifi_AtCmdWait();
+  wifi_AtCmdN(2, "AT+S.SCFG=user_desc,", password);
+  wifi_AtCmdWait();
   wifi_AtCmdBlocking("AT+S.SCFG=wifi_priv_mode,0");
   wifi_AtCmdBlocking("AT+S.SCFG=wifi_mode,3");
+  wifi_AtCmdBlocking("AT+S.SCFG=ip_use_cgis,1");  // Only output.cgi.
+
+  wifi_AtCmdBlocking("AT+S.SCFG=ip_use_dhcp,2");  // Customise IP.
+  wifi_AtCmdBlocking("AT+S.SCFG=ip_ipaddr,192.168.1.1");
+  wifi_AtCmdBlocking("AT+S.SCFG=ip_netmask,255.255.255.0");
+  wifi_AtCmdBlocking("AT+S.SCFG=ip_gw,192.168.1.1");
+  wifi_AtCmdBlocking("AT+S.SCFG=ip_dns,192.168.1.1");
+
   wifi_AtCmdBlocking("AT&W");
   wifi_SoftReset();
 }
@@ -321,12 +338,6 @@ void wifi_ApplyConfig(void) {
   }
 
   wifi_AtCmdBlocking("AT&W");  // Write settings.
-  wifi_AtCmdWait();
-
-  wifi_AtCmd("AT&V");
-  wifi->at->status |= AT_STATUS_FAST_PROCESS;
-  wifi_AtCmdWait();
-
   wifi_SoftReset();
 }
 
@@ -544,6 +555,7 @@ static bool processCind(WifiConfigType *wifiConfig, uint8_t *const buff) {
     case CIND_SET_USER_DESC:
       memset(wifiConfig->userDesc, 0, WIFI_CONFIG_USER_DESC_LENGTH);
       strncpy(wifiConfig->userDesc, pText, WIFI_CONFIG_USER_DESC_LENGTH);
+      conf_Set(CONF_PASSWORD, pText);
       break;
     case CIND_SET_SSID:
       memset(wifiConfig->ssid, 0, WIFI_CONFIG_SSID_LENGTH);
