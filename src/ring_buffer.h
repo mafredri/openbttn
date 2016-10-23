@@ -4,30 +4,29 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define RING_BUFF_SIZE 1024  // Must be power of two.
+#ifndef RING_BUFF_SIZE
+#define RING_BUFF_SIZE (1024)  // Must be power of two.
+#endif
 #define RING_BUFF_SIZE_HALF (RING_BUFF_SIZE / 2)
 #define RING_BUFF_SIZE_MASK (RING_BUFF_SIZE - 1)
 
-typedef uint16_t ring_buffer_size_t;
+typedef uint16_t RingBufferSizeType;
 
-struct ring_buffer_t {
+typedef struct RingBufferType RingBufferType;
+struct RingBufferType {
   uint8_t *const buff;
-  volatile ring_buffer_size_t head, tail, count;
+  volatile RingBufferSizeType head, tail, count;
 };
 
-typedef struct ring_buffer_t ring_buffer_t;
+void rb_Push(RingBufferType *rb, uint8_t data);
+uint8_t rb_Pop(RingBufferType *rb);
+void rb_Flush(RingBufferType *rb);
 
-void ring_buffer_push(ring_buffer_t *rb, uint8_t data);
-uint8_t ring_buffer_pop(ring_buffer_t *rb);
-void ring_buffer_flush(ring_buffer_t *rb);
+inline bool rb_Empty(RingBufferType *rb) { return rb->count == 0; }
 
-inline bool ring_buffer_empty(ring_buffer_t *rb) { return rb->count == 0; }
+inline bool rb_Full(RingBufferType *rb) { return rb->count >= RING_BUFF_SIZE; }
 
-inline bool ring_buffer_full(ring_buffer_t *rb) {
-  return rb->count >= RING_BUFF_SIZE;
-}
-
-inline bool ring_buffer_half_full(ring_buffer_t *rb) {
+inline bool rb_HalfFull(RingBufferType *rb) {
   return rb->count >= RING_BUFF_SIZE_HALF;
 }
 

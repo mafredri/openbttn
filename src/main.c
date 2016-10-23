@@ -3,12 +3,14 @@
 
 #include "button.h"
 #include "conf.h"
+#include "data.h"
 #include "debug.h"
 #include "led.h"
 #include "syscfg.h"
 #include "wifi.h"
 
-volatile uint32_t system_delay = 0;
+volatile uint32_t g_SystemTick = 0;
+volatile uint32_t g_SystemDelay = 0;
 
 static void clock_setup(void);
 static void gpio_setup(void);
@@ -38,51 +40,46 @@ int main(void) {
 
   printf("\nBootup complete!\n");
 
-  // Show blue light until WIFI is ready.
-  leds_shift(0xff0000);
+  if (g_ButtonPressed) {
+    led_TickConfigure(500, &led_TickHandlerRecovery);
+    led_TickEnable();
 
-  spwf_WaitState(SPWF_STATE_CONSOLE_ACTIVE);
-  printf("Configuring WIFI module...\n");
+    wifi_EnableFirstConfig();
+    // TODO: Escape!
+    while (1)
+      ;
 
-  conf_Load(&config);
-  wifi_CreateOpenBTTNPage();
-  wifi_StoreConfigJSON(config.data);
-
-  char ssid[32];
-  wifi_GetSSID(&ssid[0], sizeof(ssid));
-  printf("SSID: %s\n", ssid);
-
-  if (strcmp(&ssid[0], "MY_SSID") != 0) {
-    spwf_ATCmdBlocking("AT&F");  // Factory reset
-
-    spwf_ATCmdBlocking("AT+S.SCFG=console1_hwfc,0");  // Hardware flow
-                                                      // control does not
-                                                      // seem to work.
-    spwf_ATCmdBlocking("AT+S.SCFG=console1_errs,2");  // Display error codes.
-    spwf_ATCmdBlocking("AT+S.SSIDTXT=MY_SSID");
-    spwf_ATCmdBlocking("AT+S.SCFG=wifi_wpa_psk_text,MY_PASSWORD");
-    spwf_ATCmdBlocking("AT+S.SCFG=wifi_priv_mode,2");
-    spwf_ATCmdBlocking("AT+S.SCFG=wifi_mode,1");
-    spwf_ATCmdBlocking("AT+S.SCFG=ip_use_dhcp,1");
-    spwf_ATCmdBlocking("AT+S.SCFG=ip_use_decoder,2");
-    spwf_ATCmdBlocking("AT&W");  // Write settings
-    spwf_SoftReset();
+    led_TickDisable();
+  } else {
+    // Show blue light until WIFI is ready.
+    leds_shift(0xff0000);
   }
 
+  wifi_WaitState(WIFI_STATE_CONSOLE_ACTIVE);
+  printf("Configuring WIFI module...\n");
+
+  conf_Init();
+
   printf("Waiting for WIFI UP...\n");
-  spwf_WaitState(SPWF_STATE_UP);
+  wifi_WaitState(WIFI_STATE_UP);
+
+  wifi_CreateFileInRam("index.html", "text/html", (char *)&g_DataIndexHtml[0],
+                       DATA_INDEX_HTML_LENGTH);
+  conf_CreateConfigJson();
 
   // WIFI is up, power off leds.
   leds_shift(0);
 
   printf("Entering main loop!\n");
 
-  uint16_t httpStatus = 0;
   while (1) {
-    conf_HandleChange(&config);
+    conf_HandleChange();
+    wifi_HandleChange();
 
-    if (button_pressed) {
-      httpStatus = wifi_HTTPGet(&config.data->url1[0]);
+    if (g_ButtonPressed) {
+      uint16_t httpStatus;
+
+      httpStatus = wifi_HttpGet(conf_Get(CONF_URL1));
       if (httpStatus >= 400) {
         leds_shift(0x0000ff);
       } else if (httpStatus >= 100) {
@@ -96,11 +93,30 @@ int main(void) {
       delay(2000);
       leds_shift(0);
 
-      button_pressed = false;
+      g_ButtonPressed = false;
     }
   }
 
   return 0;
+}
+
+void sys_tick_handler(void) {
+  uint32_t bpDuration;
+
+  g_SystemTick++;
+  if (g_SystemDelay) {
+    g_SystemDelay--;
+  }
+
+  wifi_SysTickHandler();
+  bpDuration = button_PressedDuration();
+  led_SysTickHandler(bpDuration);
+}
+
+void delay(volatile uint32_t ms) {
+  g_SystemDelay = ms;
+  while (g_SystemDelay != 0)
+    ;
 }
 
 static void clock_setup(void) {
@@ -151,10 +167,4 @@ static void gpio_setup(void) {
   // LED8 (power indicator)
   gpio_mode_setup(GPIOA, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO5);  // PA.5
   gpio_set_output_options(GPIOA, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ, GPIO5);
-}
-
-void delay(volatile uint32_t ms) {
-  system_delay = ms;
-  while (system_delay != 0)
-    ;
 }

@@ -1,4 +1,8 @@
+#include <stdio.h>
+
 #include "led.h"
+
+LedTickState g_LedTick;
 
 static void led_power_init(void);
 static void led_timer_init(void);
@@ -6,6 +10,12 @@ static void hc595_init(void);
 static void hc595_send(uint32_t bits);
 
 void leds_init(void) {
+  LedTickState *ledTick = &g_LedTick;
+
+  ledTick->enabled = false;
+  ledTick->ticks = 0;
+  ledTick->speed = 0;
+
   hc595_init();      // Init the shift register
   leds_shift(0);     // Reset leds (off)
   led_power_init();  // Init GPIOs that control led power.
@@ -71,6 +81,63 @@ static void led_timer_init(void) {
   timer_enable_oc_preload(LED_TIMER, TIM_OC3);
 
   timer_enable_counter(LED_TIMER);
+}
+
+void led_TickConfigure(uint16_t speed, LedToggleHandler toggleFunc) {
+  LedTickState *ledTick = &g_LedTick;
+  ledTick->speed = speed;
+  ledTick->toggleFunc = toggleFunc;
+}
+
+void led_TickEnable(void) {
+  LedTickState *ledTick = &g_LedTick;
+  ledTick->enabled = true;
+}
+
+void led_TickHandlerRecovery(uint32_t ticks) {
+  if (ticks >= 10) {
+    return;
+  }
+
+  switch ((ticks % 10)) {
+    case 0:
+      leds_shift(0x01 << 16);
+      break;
+    case 1:
+      leds_shift(0x03 << 16);
+      break;
+    case 2:
+      leds_shift(0x07 << 16);
+      break;
+    case 3:
+      leds_shift(0x0F << 16);
+      break;
+    case 4:
+      leds_shift(0x1F << 16);
+      break;
+    case 5:
+    case 7:
+    case 9:
+      leds_shift(0x3F << 16);
+      break;
+    case 6:
+    case 8:
+      leds_shift(0);
+      break;
+  }
+}
+
+void led_TickDisable(void) {
+  LedTickState *ledTick = &g_LedTick;
+  ledTick->enabled = false;
+}
+
+void led_SysTickHandler(uint32_t duration) {
+  LedTickState *ledTick = &g_LedTick;
+
+  if (ledTick->enabled && ((duration % ledTick->speed) == 0)) {
+    (*ledTick->toggleFunc)(ledTick->ticks++);
+  }
 }
 
 // Shift register initialisation for HC595.
