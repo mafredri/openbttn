@@ -4,3 +4,4 @@
 *.d
 *.map
 *.bin
+public/node_modules

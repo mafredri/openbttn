@@ -2,19 +2,42 @@
 <html>
 
 <head>
-	<title>OpenBTTN</title>
+	<title>OpenBttn</title>
+	<style>
+		.actions {
+			text-align: right;
+		}
+	</style>
 </head>
 
 <body>
-	<h1>OpenBTTN</h1>
+	<h1>OpenBttn</h1>
 	<form>
-		URL:<br>
-		<input id="url1" value="http://" size="40"><br> Long press URL:<br>
-		<input id="url2" value="http://" size="40"><br>
-		<br>
-		<input id="apply" type="button" value="Apply (Memory)">
-		<input id="commit" type="button" value="Commit (EEPROM)">
+		<table>
+			<tr>
+				<td>Authentication:</td>
+				<td><input name="auth" type="password" size="25"></td>
+			</tr>
+			<tr>
+				<td>Button URL:</td>
+				<td><input name="url1" type="url" value="http://" size="25"></td>
+			</tr>
+			<tr>
+				<td>Long press URL:</td>
+				<td><input name="url2" type="url" value="http://" size="25"></td>
+			</tr>
+			<tr class="actions">
+				<td colspan="2">
+					<input name="apply" type="submit" value="Apply">
+					<input name="commit" type="submit" value="Save">
+				</td>
+			</tr>
+		</table>
 	</form>
+	<ul>
+		<li>Apply - Temporarily applies configuration to memory</li>
+		<li>Save - Permanently saves configuration to EEPROM</li>
+	</ul>
 	<script src="./src.js"></script>
 </body>
 
