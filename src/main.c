@@ -45,6 +45,9 @@ int main(void) {
     led_TickEnable();
 
     wifi_EnableFirstConfig();
+    wifi_CreateFileInRam("firstset.html", "text/html",
+                         (char *)&g_DataFirstsetHtml[0],
+                         DATA_FIRSTSET_HTML_LENGTH);
     // TODO: Escape!
     while (1)
       ;
