@@ -58,7 +58,7 @@ const at = {
 		return newURL;
 	},
 	decodeURL(url) {
-		let [domain, search, port = ''] = url.split(',');
+		let [domain = '', search = '', port = ''] = url.split(',');
 		if (port) {
 			port = ':' + port;
 		}
