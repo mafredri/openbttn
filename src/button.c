@@ -5,6 +5,8 @@
 volatile bool g_ButtonPressed = false;
 
 void button_enable(void) {
+  g_ButtonPressed = false;
+
   rcc_periph_clock_enable(RCC_GPIOC);
   rcc_periph_clock_enable(RCC_SYSCFG);
 
@@ -14,12 +16,11 @@ void button_enable(void) {
                           GPIO6 | GPIO13);
 
   exti_select_source(EXTI13, GPIOC);
-  g_ButtonPressed = false;
   exti_set_trigger(EXTI13, EXTI_TRIGGER_RISING);
   exti_enable_request(EXTI13);
 
   nvic_enable_irq(NVIC_EXTI15_10_IRQ);
-  nvic_set_priority(NVIC_EXTI15_10_IRQ, 4 << 4);
+  nvic_set_priority(NVIC_EXTI15_10_IRQ, (4 << 4));
 }
 
 // TODO: Not system tick.
