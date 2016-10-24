@@ -61,7 +61,7 @@ void wifi_SoftReset(void) {
   // Unset the power on state so that we can wait for it.
   wifi->state &= ~(WIFI_STATE_POWER_ON);
 
-  wifi_SendString("AT+CFUN=1\r");  // Reset wifi module.
+  wifi_SendString("AT+CFUN=1\r"); // Reset wifi module.
   wifi_WaitState(WIFI_STATE_POWER_ON);
 }
 
@@ -219,9 +219,9 @@ void wifi_GetSsid(char *dest, size_t len) {
 
   s = strstr((const char *)wifi->at->buff, "#  wifi_ssid = ");
   if (s) {
-    s += 15;  // Skip over "#  wifi_ssid = ".
+    s += 15; // Skip over "#  wifi_ssid = ".
     int i;
-    for (i = 0; i < 32 && isxdigit(*s); i++) {  // Max lenght is 32.
+    for (i = 0; i < 32 && isxdigit(*s); i++) { // Max lenght is 32.
       dest[i] = strtol(s, &s, 16);
       if (*s == ':') {
         s++;
@@ -230,12 +230,11 @@ void wifi_GetSsid(char *dest, size_t len) {
   }
 }
 
-const char httpFileHeader[] =
-    "HTTP/1.1 200 OK\n"
-    "Server: OpenBttn\n"
-    "Connection: close\n"
-    "Content-Type: %s\n"
-    "Content-Length: %d\n\n";
+const char httpFileHeader[] = "HTTP/1.1 200 OK\n"
+                              "Server: OpenBttn\n"
+                              "Connection: close\n"
+                              "Content-Type: %s\n"
+                              "Content-Length: %d\n\n";
 
 void wifi_CreateFileInRam(const char *name, const char *contentType,
                           const char *data, uint16_t len) {
@@ -282,9 +281,9 @@ void wifi_EnableFirstConfig(const char *ssid, const char *password) {
   wifi_AtCmdWait();
   wifi_AtCmdBlocking("AT+S.SCFG=wifi_priv_mode,0");
   wifi_AtCmdBlocking("AT+S.SCFG=wifi_mode,3");
-  wifi_AtCmdBlocking("AT+S.SCFG=ip_use_cgis,1");  // Only output.cgi.
+  wifi_AtCmdBlocking("AT+S.SCFG=ip_use_cgis,1"); // Only output.cgi.
 
-  wifi_AtCmdBlocking("AT+S.SCFG=ip_use_dhcp,2");  // Customise IP.
+  wifi_AtCmdBlocking("AT+S.SCFG=ip_use_dhcp,2"); // Customise IP.
   wifi_AtCmdBlocking("AT+S.SCFG=ip_ipaddr,192.168.1.1");
   wifi_AtCmdBlocking("AT+S.SCFG=ip_netmask,255.255.255.0");
   wifi_AtCmdBlocking("AT+S.SCFG=ip_gw,192.168.1.1");
@@ -299,12 +298,12 @@ void wifi_EnableFirstConfig(const char *ssid, const char *password) {
 void wifi_ApplyConfig(void) {
   WifiDataType *wifi = &g_WifiData;
 
-  wifi_AtCmdBlocking("AT&F");                   // Factory reset.
-  wifi_AtCmdBlocking("AT+S.SCFG=wifi_mode,1");  // Station mode.
+  wifi_AtCmdBlocking("AT&F");                  // Factory reset.
+  wifi_AtCmdBlocking("AT+S.SCFG=wifi_mode,1"); // Station mode.
   wifi_AtCmdN(2, "AT+S.SSIDTXT=", wifi->config->ssid);
   wifi_AtCmdWait();
 
-  if (wifi->config->privMode == 2) {  // WPA & WPA2.
+  if (wifi->config->privMode == 2) { // WPA & WPA2.
     wifi_AtCmdBlocking("AT+S.SCFG=wifi_priv_mode,2");
     wifi_AtCmdN(2, "AT+S.SCFG=wifi_wpa_psk_text,", wifi->config->password);
     wifi_AtCmdWait();
@@ -339,7 +338,7 @@ void wifi_ApplyConfig(void) {
     wifi_AtCmdWait();
   }
 
-  wifi_AtCmdBlocking("AT&W");  // Write settings.
+  wifi_AtCmdBlocking("AT&W"); // Write settings.
   wifi_SoftReset();
 }
 
@@ -359,36 +358,36 @@ process_loop:
 
   if (data != '\0') {
     switch (wifi->recv) {
-      // Asynchronous indications can happen at any point except when an AT
-      // command is processing, this is the default wifi_RecvState.
-      case RECV_ASYNC_INDICATION:
-        status = processAsyncIndication(wifi->tmpBuff, data);
+    // Asynchronous indications can happen at any point except when an AT
+    // command is processing, this is the default wifi_RecvState.
+    case RECV_ASYNC_INDICATION:
+      status = processAsyncIndication(wifi->tmpBuff, data);
 
-        if (status == WIFI_PROCESS_COMPLETE) {
-          if (!processWind(&wifi->state, wifi->tmpBuff) &&
-              !processCind(wifi->config, wifi->tmpBuff)) {
-            printf("Could not process asynchronous indication\n");
-          }
-
-          memset(wifi->tmpBuff, 0, WIFI_TMP_BUFF_SIZE);
+      if (status == WIFI_PROCESS_COMPLETE) {
+        if (!processWind(&wifi->state, wifi->tmpBuff) &&
+            !processCind(wifi->config, wifi->tmpBuff)) {
+          printf("Could not process asynchronous indication\n");
         }
 
-        break;
-      // AT command responses only happen after an AT command has been issued,
-      // some only return OK / ERROR whereas others have a response body, ending
-      // with OK / ERROR.
-      case RECV_AT_RESPONSE:
-        status = processAtResponse(wifi->at, data);
-        if (status == WIFI_PROCESS_COMPLETE) {
-          wifi->recv = RECV_ASYNC_INDICATION;
-        } else if ((wifi->at->status & AT_STATUS_FAST_PROCESS) != 0) {
-          goto process_loop;
-        }
-        break;
-      // Unhandled recv state.
-      default:
-        printf("Unknown wifi->recv state\n");
-        break;
+        memset(wifi->tmpBuff, 0, WIFI_TMP_BUFF_SIZE);
+      }
+
+      break;
+    // AT command responses only happen after an AT command has been issued,
+    // some only return OK / ERROR whereas others have a response body, ending
+    // with OK / ERROR.
+    case RECV_AT_RESPONSE:
+      status = processAtResponse(wifi->at, data);
+      if (status == WIFI_PROCESS_COMPLETE) {
+        wifi->recv = RECV_ASYNC_INDICATION;
+      } else if ((wifi->at->status & AT_STATUS_FAST_PROCESS) != 0) {
+        goto process_loop;
+      }
+      break;
+    // Unhandled recv state.
+    default:
+      printf("Unknown wifi->recv state\n");
+      break;
     }
   }
 }
@@ -473,38 +472,38 @@ static bool processWind(WifiStateType *state, uint8_t *const buff) {
 
   char *windStart = strstr((const char *)buff, "+WIND:");
   if (windStart) {
-    windStart += 6;  // Skip over "+WIND:", next char is a digit.
+    windStart += 6; // Skip over "+WIND:", next char is a digit.
 
     // We assume the indication ID is never greater than 99 (two digits).
-    wind = *windStart++ - '0';  // Convert char to int
+    wind = *windStart++ - '0'; // Convert char to int
     if (*windStart != ':') {
-      wind *= 10;                // First digit was a multiple of 10
-      wind += *windStart - '0';  // Convert char to int
+      wind *= 10;               // First digit was a multiple of 10
+      wind += *windStart - '0'; // Convert char to int
     }
   }
 
   switch (wind) {
-    case WIND_POWER_ON:
-      *state = WIFI_STATE_POWER_ON;  // Reset WIFI state after power on.
-      break;
-    case WIND_RESET:
-      *state = WIFI_STATE_OFF;
-      break;
-    case WIND_CONSOLE_ACTIVE:
-      *state |= WIFI_STATE_CONSOLE_ACTIVE;
-      break;
-    case WIND_WIFI_ASSOCIATED:
-      *state |= WIFI_STATE_ASSOCIATED;
-      break;
-    case WIND_WIFI_JOINED:
-      *state |= WIFI_STATE_JOINED;
-      break;
-    case WIND_WIFI_UP:
-      *state |= WIFI_STATE_UP;
-      break;
-    case WIND_UNDEFINED:
-      return false;
-      break;
+  case WIND_POWER_ON:
+    *state = WIFI_STATE_POWER_ON; // Reset WIFI state after power on.
+    break;
+  case WIND_RESET:
+    *state = WIFI_STATE_OFF;
+    break;
+  case WIND_CONSOLE_ACTIVE:
+    *state |= WIFI_STATE_CONSOLE_ACTIVE;
+    break;
+  case WIND_WIFI_ASSOCIATED:
+    *state |= WIFI_STATE_ASSOCIATED;
+    break;
+  case WIND_WIFI_JOINED:
+    *state |= WIFI_STATE_JOINED;
+    break;
+  case WIND_WIFI_UP:
+    *state |= WIFI_STATE_UP;
+    break;
+  case WIND_UNDEFINED:
+    return false;
+    break;
   }
 
   return true;
@@ -519,16 +518,16 @@ static bool processCind(WifiConfigType *wifiConfig, uint8_t *const buff) {
 
   char *cindStart = strstr((const char *)buff, "+CIND:");
   if (cindStart) {
-    cindStart += 6;  // Skip over "+CIND:", next char is a digit.
+    cindStart += 6; // Skip over "+CIND:", next char is a digit.
 
     // We assume the indication ID is never greater than 99 (two digits).
-    cind = *cindStart++ - '0';  // Convert char to int
+    cind = *cindStart++ - '0'; // Convert char to int
     if (*cindStart != ':') {
-      cind *= 10;                  // First digit was a multiple of 10
-      cind += *cindStart++ - '0';  // Convert char to int
+      cind *= 10;                 // First digit was a multiple of 10
+      cind += *cindStart++ - '0'; // Convert char to int
     }
 
-    cindStart++;  // Skip over ':', leaving message.
+    cindStart++; // Skip over ':', leaving message.
   }
 
   if (cind != CIND_UNDEF) {
@@ -537,60 +536,60 @@ static bool processCind(WifiConfigType *wifiConfig, uint8_t *const buff) {
       debugPrintBuffer((uint8_t *)pText, 'C');
     } else {
       printf("Received non-authenticated CIND, ignoring...\n");
-      return true;  // We processed the CIND, but it was unauthorised.
+      return true; // We processed the CIND, but it was unauthorised.
     }
   }
 
   switch (cind) {
-    case CIND_AUTHENTICATE:
-      conf_Unlock(pText);
-      break;
-    case CIND_COMMIT_CONFIG:
-      conf_RequestCommit();
-      break;
-    case CIND_SET_URL1:
-      conf_Set(CONF_URL1, pText);
-      break;
-    case CIND_SET_URL2:
-      conf_Set(CONF_URL2, pText);
-      break;
-    case CIND_SET_USER_DESC:
-      memset(wifiConfig->userDesc, 0, WIFI_CONFIG_USER_DESC_LENGTH);
-      strncpy(wifiConfig->userDesc, pText, WIFI_CONFIG_USER_DESC_LENGTH);
-      conf_Set(CONF_PASSWORD, pText);
-      break;
-    case CIND_SET_SSID:
-      memset(wifiConfig->ssid, 0, WIFI_CONFIG_SSID_LENGTH);
-      strncpy(wifiConfig->ssid, pText, WIFI_CONFIG_SSID_LENGTH);
-      break;
-    case CIND_SET_PASSWORD:
-      memset(wifiConfig->password, 0, WIFI_CONFIG_PASSWORD_LENGTH);
-      strncpy(wifiConfig->password, pText, WIFI_CONFIG_PASSWORD_LENGTH);
-      break;
-    case CIND_SET_PRIV_MODE:
-      wifiConfig->privMode = (uint8_t)atoi(pText);
-      break;
-    case CIND_SET_DHCP:
-      wifiConfig->dhcp = (uint8_t)atoi(pText);
-      break;
-    case CIND_SET_IP_ADDR:
-      wifiConfig->ipAddr = ip_atoi(pText);
-      break;
-    case CIND_SET_IP_NETMASK:
-      wifiConfig->ipNetmask = ip_atoi(pText);
-      break;
-    case CIND_SET_IP_GATEWAY:
-      wifiConfig->ipGateway = ip_atoi(pText);
-      break;
-    case CIND_SET_IP_DNS:
-      wifiConfig->ipDns = ip_atoi(pText);
-      break;
-    case CIND_WIFI_COMMIT:
-      wifiConfig->changed = true;
-      break;
-    case CIND_UNDEF:
-      return false;
-      break;
+  case CIND_AUTHENTICATE:
+    conf_Unlock(pText);
+    break;
+  case CIND_COMMIT_CONFIG:
+    conf_RequestCommit();
+    break;
+  case CIND_SET_URL1:
+    conf_Set(CONF_URL1, pText);
+    break;
+  case CIND_SET_URL2:
+    conf_Set(CONF_URL2, pText);
+    break;
+  case CIND_SET_USER_DESC:
+    memset(wifiConfig->userDesc, 0, WIFI_CONFIG_USER_DESC_LENGTH);
+    strncpy(wifiConfig->userDesc, pText, WIFI_CONFIG_USER_DESC_LENGTH);
+    conf_Set(CONF_PASSWORD, pText);
+    break;
+  case CIND_SET_SSID:
+    memset(wifiConfig->ssid, 0, WIFI_CONFIG_SSID_LENGTH);
+    strncpy(wifiConfig->ssid, pText, WIFI_CONFIG_SSID_LENGTH);
+    break;
+  case CIND_SET_PASSWORD:
+    memset(wifiConfig->password, 0, WIFI_CONFIG_PASSWORD_LENGTH);
+    strncpy(wifiConfig->password, pText, WIFI_CONFIG_PASSWORD_LENGTH);
+    break;
+  case CIND_SET_PRIV_MODE:
+    wifiConfig->privMode = (uint8_t)atoi(pText);
+    break;
+  case CIND_SET_DHCP:
+    wifiConfig->dhcp = (uint8_t)atoi(pText);
+    break;
+  case CIND_SET_IP_ADDR:
+    wifiConfig->ipAddr = ip_atoi(pText);
+    break;
+  case CIND_SET_IP_NETMASK:
+    wifiConfig->ipNetmask = ip_atoi(pText);
+    break;
+  case CIND_SET_IP_GATEWAY:
+    wifiConfig->ipGateway = ip_atoi(pText);
+    break;
+  case CIND_SET_IP_DNS:
+    wifiConfig->ipDns = ip_atoi(pText);
+    break;
+  case CIND_WIFI_COMMIT:
+    wifiConfig->changed = true;
+    break;
+  case CIND_UNDEF:
+    return false;
+    break;
   }
 
   return true;

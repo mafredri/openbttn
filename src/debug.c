@@ -33,8 +33,7 @@ static void debug_gpio_enable(void) {
   rcc_periph_clock_enable(RCC_DEBUG_USART);
 
   // Debug port (USART1)
-  gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE,
-                  GPIO9);  // PA.9 USART1_TX
+  gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9); // PA.9 USART1_TX
   gpio_set_output_options(GPIOA, GPIO_OTYPE_PP, GPIO_OSPEED_10MHZ, GPIO9);
   gpio_set_af(GPIOA, GPIO_AF7, GPIO9);
 

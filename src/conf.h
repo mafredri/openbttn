@@ -23,7 +23,7 @@ typedef enum ConfigType {
 } ConfigType;
 
 typedef struct Config {
-  ConfigData* data;
+  ConfigData *data;
   volatile bool unlocked;
   volatile bool commit;
   volatile bool updated;
@@ -32,11 +32,11 @@ typedef struct Config {
 void conf_Init(void);
 void conf_Commit(void);
 void conf_Load(void);
-void conf_Unlock(const char* value);
+void conf_Unlock(const char *value);
 bool conf_IsUnlocked(void);
-void* conf_Get(ConfigType type);
-void conf_SetTempPassword(const char* password);
-void conf_Set(ConfigType type, const void* value);
+void *conf_Get(ConfigType type);
+void conf_SetTempPassword(const char *password);
+void conf_Set(ConfigType type, const void *value);
 void conf_RequestCommit(void);
 void conf_CreateConfigJson(void);
 void conf_HandleChange(void);

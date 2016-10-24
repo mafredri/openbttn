@@ -16,10 +16,10 @@ void leds_init(void) {
   ledTick->ticks = 0;
   ledTick->speed = 0;
 
-  hc595_init();      // Init the shift register
-  leds_shift(0);     // Reset leds (off)
-  led_power_init();  // Init GPIOs that control led power.
-  led_timer_init();  // Timer manages led power output through PWM.
+  hc595_init();     // Init the shift register
+  leds_shift(0);    // Reset leds (off)
+  led_power_init(); // Init GPIOs that control led power.
+  led_timer_init(); // Timer manages led power output through PWM.
 }
 
 void leds_set_brightness(uint32_t red, uint32_t green, uint32_t blue) {
@@ -35,7 +35,7 @@ static void led_power_init(void) {
   rcc_periph_clock_enable(RCC_GPIOB);
 
   gpio_clear(GPIOA, GPIO6 | GPIO7);
-  gpio_clear(GPIOB, GPIO0);  // LED (Blue)
+  gpio_clear(GPIOB, GPIO0); // LED (Blue)
 
   // PA.6 (Red, TIM3_CH1) & PA.7 (Green, TIM3_CH2)
   gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO6 | GPIO7);
@@ -100,30 +100,30 @@ void led_TickHandlerRecovery(uint32_t ticks) {
   }
 
   switch ((ticks % 10)) {
-    case 0:
-      leds_shift(0x01 << 16);
-      break;
-    case 1:
-      leds_shift(0x03 << 16);
-      break;
-    case 2:
-      leds_shift(0x07 << 16);
-      break;
-    case 3:
-      leds_shift(0x0F << 16);
-      break;
-    case 4:
-      leds_shift(0x1F << 16);
-      break;
-    case 5:
-    case 7:
-    case 9:
-      leds_shift(0x3F << 16);
-      break;
-    case 6:
-    case 8:
-      leds_shift(0);
-      break;
+  case 0:
+    leds_shift(0x01 << 16);
+    break;
+  case 1:
+    leds_shift(0x03 << 16);
+    break;
+  case 2:
+    leds_shift(0x07 << 16);
+    break;
+  case 3:
+    leds_shift(0x0F << 16);
+    break;
+  case 4:
+    leds_shift(0x1F << 16);
+    break;
+  case 5:
+  case 7:
+  case 9:
+    leds_shift(0x3F << 16);
+    break;
+  case 6:
+  case 8:
+    leds_shift(0);
+    break;
   }
 }
 

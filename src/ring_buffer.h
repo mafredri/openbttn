@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #ifndef RING_BUFF_SIZE
-#define RING_BUFF_SIZE (1024)  // Must be power of two.
+#define RING_BUFF_SIZE (1024) // Must be power of two.
 #endif
 #define RING_BUFF_SIZE_HALF (RING_BUFF_SIZE / 2)
 #define RING_BUFF_SIZE_MASK (RING_BUFF_SIZE - 1)

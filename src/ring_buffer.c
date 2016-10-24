@@ -10,7 +10,7 @@ void rb_Push(RingBufferType *rb, uint8_t data) {
   rb->buff[(rb->head++) & RING_BUFF_SIZE_MASK] = data;
 
   if (rb_Full(rb)) {
-    rb->tail++;  // Overflow, we just lost some data.
+    rb->tail++; // Overflow, we just lost some data.
   } else {
     rb->count++;
   }

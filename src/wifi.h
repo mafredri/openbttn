@@ -18,10 +18,10 @@
 #define WIFI_NVIC_IRQ NVIC_USART3_IRQ
 
 #ifndef WIFI_TMP_BUFF_SIZE
-#define WIFI_TMP_BUFF_SIZE 1024  // Used for WIND (WIFI indication).
+#define WIFI_TMP_BUFF_SIZE 1024 // Used for WIND (WIFI indication).
 #endif
 #ifndef WIFI_AT_BUFF_SIZE
-#define WIFI_AT_BUFF_SIZE (1024)  // Used for AT / HTTP responses.
+#define WIFI_AT_BUFF_SIZE (1024) // Used for AT / HTTP responses.
 #endif
 
 #define WIFI_STATE_OFF (uint16_t)(0)
@@ -58,8 +58,8 @@ typedef volatile enum WifiRecvType {
 } WifiRecvType;
 
 typedef struct WifiAtType {
-  volatile uint8_t status;  // Current AT command status.
-  uint8_t *const buff;      // AT buffer status.
+  volatile uint8_t status; // Current AT command status.
+  uint8_t *const buff;     // AT buffer status.
   uint8_t *last_cr_lf;
   uint16_t pos;
 } WifiAtType;
@@ -90,27 +90,27 @@ extern WifiDataType g_WifiData;
 
 // WIND IDs as handled by the application.
 typedef enum {
-  WIND_CONSOLE_ACTIVE = 0,    // Console active, can accept AT commands.
-  WIND_POWER_ON = 1,          // Power on (also after reset).
-  WIND_RESET = 2,             // Module will reset.
-  WIND_WIFI_JOINED = 19,      // Join BSSID (AP MAC).
-  WIND_WIFI_UP = 24,          // Connected with IP.
-  WIND_WIFI_ASSOCIATED = 25,  // Successfull association with SSID.
-  WIND_UNDEFINED = 0xFF,      // Undefined state.
+  WIND_CONSOLE_ACTIVE = 0,   // Console active, can accept AT commands.
+  WIND_POWER_ON = 1,         // Power on (also after reset).
+  WIND_RESET = 2,            // Module will reset.
+  WIND_WIFI_JOINED = 19,     // Join BSSID (AP MAC).
+  WIND_WIFI_UP = 24,         // Connected with IP.
+  WIND_WIFI_ASSOCIATED = 25, // Successfull association with SSID.
+  WIND_UNDEFINED = 0xFF,     // Undefined state.
 } WifiWindType;
 
 #define WIFI_CIND_TEXT_LENGTH 120
-#define WIFI_CIND_MESSAGE_LENGTH (WIFI_CIND_TEXT_LENGTH - 9)  // +CIND:00:
+#define WIFI_CIND_MESSAGE_LENGTH (WIFI_CIND_TEXT_LENGTH - 9) // +CIND:00:
 
 // Custom messages for the openbttn firmware.
 typedef enum {
   CIND_AUTHENTICATE = 0,
-  CIND_COMMIT_CONFIG = 1,  // Commit configuration changes to EEPROM.
-  CIND_SET_URL1 = 2,       // Set URL1 message.
-  CIND_SET_URL2 = 3,       // Set URL2 message.
+  CIND_COMMIT_CONFIG = 1, // Commit configuration changes to EEPROM.
+  CIND_SET_URL1 = 2,      // Set URL1 message.
+  CIND_SET_URL2 = 3,      // Set URL2 message.
 
   // Configuration for the SPWF01SA WIFI module.
-  CIND_SET_USER_DESC = 20,  // Set system authentication password.
+  CIND_SET_USER_DESC = 20, // Set system authentication password.
   CIND_SET_SSID = 21,
   CIND_SET_PASSWORD = 22,
   CIND_SET_PRIV_MODE = 23,
@@ -120,7 +120,7 @@ typedef enum {
   CIND_SET_IP_GATEWAY = 27,
   CIND_SET_IP_DNS = 28,
   CIND_WIFI_COMMIT = 29,
-  CIND_UNDEF = 0xFF,  // Undefined message.
+  CIND_UNDEF = 0xFF, // Undefined message.
 } WifiCindType;
 
 void wifi_Init(void);
