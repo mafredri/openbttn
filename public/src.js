@@ -125,8 +125,6 @@ function inputToCIND(input) {
 		return;
 	}
 
-	console.log(input);
-
 	let value;
 	if (input.name.match(/^url/)) {
 		value = at.encodeURL(input.value);
