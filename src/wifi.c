@@ -308,6 +308,8 @@ void wifi_ApplyConfig(void) {
     wifi_AtCmdBlocking("AT+S.SCFG=wifi_priv_mode,2");
     wifi_AtCmdN(2, "AT+S.SCFG=wifi_wpa_psk_text,", wifi->config->password);
     wifi_AtCmdWait();
+  } else {
+    printf("Open and WEP wifi modes not implemented!\n");
   }
 
   wifi_AtCmdN(2, "AT+S.SCFG=user_desc,", wifi->config->userDesc);
