@@ -3,18 +3,45 @@
 
 #include "syscfg.h"
 
+#define LED_TIMER TIM3
+#define RCC_LED_TIMER RCC_TIM3
+#define LED_AF GPIO_AF2
+
+// PA.6 (Red, TIM3_CH1)
+#define RCC_LED_RED RCC_GPIOA
+#define LED_RED_PORT GPIOA
+#define LED_RED_PIN GPIO6
+
+// PA.7 (Green, TIM3_CH2)
+#define RCC_LED_GREEN RCC_GPIOA
+#define LED_GREEN_PORT GPIOA
+#define LED_GREEN_PIN GPIO7
+
+// PB.0 (Blue, TIM3_CH3)
+#define RCC_LED_BLUE RCC_GPIOB
+#define LED_BLUE_PORT GPIOB
+#define LED_BLUE_PIN GPIO0
+
+#define RCC_HC595 RCC_GPIOC
+#define HC595_PORT GPIOC
+#define HC595_STCP GPIO9  // PC.9
+#define HC595_SHCP GPIO10 // PC.10
+#define HC595_DS GPIO11   // PC.11
+#define HC595_GPIOS HC595_STCP | HC595_SHCP | HC595_DS
+
 typedef void (*LedToggleHandler)(uint32_t ticks);
 
-typedef struct LedTickState {
+typedef struct LedTickState LedTickState;
+struct LedTickState {
   volatile uint16_t speed;
   volatile uint32_t ticks;
   LedToggleHandler toggleFunc;
   volatile bool enabled;
-} LedTickState;
+};
 
-void leds_init(void);
-void leds_set_brightness(uint32_t red, uint32_t green, uint32_t blue);
-void leds_shift(uint32_t bits);
+void led_Init(void);
+void led_SetBrightness(uint32_t red, uint32_t green, uint32_t blue);
+void led_Set(uint32_t bits);
 
 void led_TickConfigure(uint16_t speed, LedToggleHandler handler);
 void led_TickEnable(void);

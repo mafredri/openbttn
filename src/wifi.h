@@ -50,21 +50,24 @@
 #define WIFI_PROCESS_COMPLETE true
 #define WIFI_PROCESS_INCOMPLETE false
 
-typedef volatile uint16_t WifiStateType;
+typedef uint16_t WifiState;
 
-typedef volatile enum WifiRecvType {
+typedef enum WifiRecv WifiRecv;
+enum WifiRecv {
   RECV_ASYNC_INDICATION = 0,
   RECV_AT_RESPONSE,
-} WifiRecvType;
+};
 
-typedef struct WifiAtType {
+typedef struct WifiAt WifiAt;
+struct WifiAt {
   volatile uint8_t status; // Current AT command status.
   uint8_t *const buff;     // AT buffer status.
   uint8_t *last_cr_lf;
   uint16_t pos;
-} WifiAtType;
+};
 
-typedef struct WifiConfigType {
+typedef struct WifiConfig WifiConfig;
+struct WifiConfig {
   char userDesc[WIFI_CONFIG_USER_DESC_LENGTH + 1];
   char ssid[WIFI_CONFIG_SSID_LENGTH + 1];
   char password[WIFI_CONFIG_PASSWORD_LENGTH + 1];
@@ -76,20 +79,21 @@ typedef struct WifiConfigType {
   uint32_t ipDns;
   bool changed;
   bool authenticated;
-} WifiConfigType;
+};
 
-typedef struct WifiDataType {
-  WifiStateType state;
-  WifiRecvType recv;
-  WifiAtType *at;
-  WifiConfigType *config;
-  RingBufferType *ringBuff;
+typedef struct WifiData WifiData;
+struct WifiData {
+  volatile WifiState state;
+  volatile WifiRecv recv;
+  WifiAt *at;
+  WifiConfig *config;
+  RingBuffer *ringBuff;
   uint8_t *tmpBuff;
-} WifiDataType;
-extern WifiDataType g_WifiData;
+};
 
 // WIND IDs as handled by the application.
-typedef enum {
+typedef enum WifiWind WifiWind;
+enum WifiWind {
   WIND_CONSOLE_ACTIVE = 0,   // Console active, can accept AT commands.
   WIND_POWER_ON = 1,         // Power on (also after reset).
   WIND_RESET = 2,            // Module will reset.
@@ -97,13 +101,14 @@ typedef enum {
   WIND_WIFI_UP = 24,         // Connected with IP.
   WIND_WIFI_ASSOCIATED = 25, // Successfull association with SSID.
   WIND_UNDEFINED = 0xFF,     // Undefined state.
-} WifiWindType;
+};
 
 #define WIFI_CIND_TEXT_LENGTH 120
 #define WIFI_CIND_MESSAGE_LENGTH (WIFI_CIND_TEXT_LENGTH - 9) // +CIND:00:
 
 // Custom messages for the openbttn firmware.
-typedef enum {
+typedef enum WifiCind WifiCind;
+enum WifiCind {
   CIND_AUTHENTICATE = 0,
   CIND_COMMIT_CONFIG = 1, // Commit configuration changes to EEPROM.
   CIND_SET_URL1 = 2,      // Set URL1 message.
@@ -121,14 +126,16 @@ typedef enum {
   CIND_SET_IP_DNS = 28,
   CIND_WIFI_COMMIT = 29,
   CIND_UNDEF = 0xFF, // Undefined message.
-} WifiCindType;
+};
+
+extern WifiData g_wifiData;
 
 void wifi_Init(void);
 void wifi_PowerOn(void);
 void wifi_PowerOff(void);
 void wifi_SoftReset(void);
 void wifi_HardReset(void);
-void wifi_WaitState(WifiStateType states);
+void wifi_WaitState(WifiState states);
 void wifi_HandleChange(void);
 void wifi_AtCmdN(int n, ...);
 void wifi_AtCmd(char *str);

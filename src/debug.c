@@ -5,8 +5,8 @@
 #include "debug.h"
 #include "syscfg.h"
 
-static void debug_gpio_enable(void);
-static void debug_usart_setup(void);
+static void gpioSetup(void);
+static void usartSetup(void);
 
 // Implement _write for newlib(-nano)
 int _write(int file, char *ptr, int len) {
@@ -24,28 +24,29 @@ int _write(int file, char *ptr, int len) {
   return -1;
 }
 
-void debug_init(void) {
-  debug_gpio_enable();
-  debug_usart_setup();
+void debug_Init(void) {
+  gpioSetup();
+  usartSetup();
 }
 
-static void debug_gpio_enable(void) {
+void debug_Send(char data) { usart_send_blocking(DEBUG_USART, data); }
+
+// gpioSetup configures the debug port pings in AF mode.
+static void gpioSetup(void) {
   rcc_periph_clock_enable(RCC_DEBUG_USART);
 
-  // Debug port (USART1)
-  gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9); // PA.9 USART1_TX
-  gpio_set_output_options(GPIOA, GPIO_OTYPE_PP, GPIO_OSPEED_10MHZ, GPIO9);
-  gpio_set_af(GPIOA, GPIO_AF7, GPIO9);
+  gpio_mode_setup(DEBUG_GPIO_PORT, GPIO_MODE_AF, GPIO_PUPD_NONE, DEBUG_PIN_TX);
+  gpio_set_output_options(DEBUG_GPIO_PORT, GPIO_OTYPE_PP, GPIO_OSPEED_10MHZ,
+                          DEBUG_PIN_TX);
+  gpio_set_af(DEBUG_GPIO_PORT, GPIO_AF7, DEBUG_PIN_TX);
 
-#if false
-  gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE,
-                  GPIO10);  // PA.10 USART1_RX
-  gpio_set_output_options(GPIOA, GPIO_OTYPE_PP, GPIO_OSPEED_10MHZ, GPIO10);
-  gpio_set_af(GPIOA, GPIO_AF7, GPIO10);
-#endif
+  gpio_mode_setup(DEBUG_GPIO_PORT, GPIO_MODE_AF, GPIO_PUPD_NONE, DEBUG_PIN_RX);
+  gpio_set_output_options(DEBUG_GPIO_PORT, GPIO_OTYPE_PP, GPIO_OSPEED_10MHZ,
+                          DEBUG_PIN_RX);
+  gpio_set_af(DEBUG_GPIO_PORT, GPIO_AF7, DEBUG_PIN_RX);
 }
 
-static void debug_usart_setup(void) {
+static void usartSetup(void) {
   usart_set_baudrate(DEBUG_USART, 115200);
   usart_set_databits(DEBUG_USART, 8);
   usart_set_stopbits(DEBUG_USART, USART_STOPBITS_1);

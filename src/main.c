@@ -12,13 +12,13 @@
 volatile uint32_t g_SystemTick = 0;
 volatile uint32_t g_SystemDelay = 0;
 
-static void clock_setup(void);
-static void gpio_setup(void);
+static void clockSetup(void);
+static void gpioSetup(void);
 
 int main(void) {
-  clock_setup();
+  clockSetup();
 
-  gpio_setup();
+  gpioSetup();
 
   // Power on LED8.
   gpio_set(GPIOA, GPIO5);
@@ -30,19 +30,19 @@ int main(void) {
   gpio_set(GPIOC, GPIO7);
   delay(50);
 
-  debug_init();
+  debug_Init();
   wifi_Init();
 
-  button_enable();
+  button_Init();
 
-  leds_init();
-  leds_set_brightness(119, 119, 119);
+  led_Init();
+  led_SetBrightness(119, 119, 119);
 
   printf("\nBootup complete!\n");
 
   conf_Init();
 
-  if (g_ButtonPressed || gpio_get(BUTTON_GPIO_PORT, BUTTON_PIN_IT)) {
+  if (g_buttonPressed || gpio_get(BUTTON_GPIO_PORT, BUTTON_PIN_IT)) {
     led_TickConfigure(500, &led_TickHandlerRecovery);
     led_TickEnable();
 
@@ -62,7 +62,7 @@ int main(void) {
     led_TickDisable();
   } else {
     // Show blue light until WIFI is ready.
-    leds_shift(0xff0000);
+    led_Set(0xff0000);
   }
 
   wifi_CreateFileInRam("index.html", "text/html", (char *)&g_DataIndexHtml[0],
@@ -73,7 +73,7 @@ int main(void) {
   wifi_WaitState(WIFI_STATE_UP);
 
   // WIFI is up, power off leds.
-  leds_shift(0);
+  led_Set(0);
 
   printf("Entering main loop!\n");
 
@@ -81,31 +81,31 @@ int main(void) {
     conf_HandleChange();
     wifi_HandleChange();
 
-    if (g_ButtonPressed) {
+    if (g_buttonPressed) {
       uint16_t httpStatus;
 
       httpStatus = wifi_HttpGet(conf_Get(CONF_URL1));
       if (httpStatus >= 400) {
-        leds_shift(0x0000ff);
+        led_Set(0x0000ff);
       } else if (httpStatus >= 100) {
-        leds_shift(0x00ff00);
+        led_Set(0x00ff00);
       } else {
-        leds_shift(0xffffff);
+        led_Set(0xffffff);
       }
 
       printf("HTTP %d\n", httpStatus);
 
       delay(2000);
-      leds_shift(0);
+      led_Set(0);
 
-      g_ButtonPressed = false;
+      g_buttonPressed = false;
     }
   }
 
   return 0;
 }
 
-void sys_tick_handler(void) {
+void SysTick_Handler(void) {
   uint32_t bpDuration;
 
   g_SystemTick++;
@@ -124,7 +124,7 @@ void delay(volatile uint32_t ms) {
     ;
 }
 
-static void clock_setup(void) {
+static void clockSetup(void) {
   const struct rcc_clock_scale bttn_clock_config = {
       .pll_source = RCC_CFGR_PLLSRC_HSE_CLK, // Use HSE
       .pll_mul = RCC_CFGR_PLLMUL_MUL8,
@@ -147,7 +147,7 @@ static void clock_setup(void) {
   systick_counter_enable();
 }
 
-static void gpio_setup(void) {
+static void gpioSetup(void) {
   rcc_periph_clock_enable(RCC_GPIOA);
   rcc_periph_clock_enable(RCC_GPIOB);
   rcc_periph_clock_enable(RCC_GPIOC);
@@ -158,18 +158,18 @@ static void gpio_setup(void) {
   gpio_clear(GPIOA, GPIO5); // LED8
 
   // Boot pin
-  gpio_mode_setup(GPIOB, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO5); // PB.5
+  gpio_mode_setup(GPIOB, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO5);
   gpio_set_output_options(GPIOB, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ, GPIO5);
 
   // Power switch
-  gpio_mode_setup(GPIOB, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO2); // PB.2
+  gpio_mode_setup(GPIOB, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO2);
   gpio_set_output_options(GPIOB, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ, GPIO2);
 
   // Power control
-  gpio_mode_setup(GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO7); // PC.7
+  gpio_mode_setup(GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO7);
   gpio_set_output_options(GPIOC, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ, GPIO7);
 
   // LED8 (power indicator)
-  gpio_mode_setup(GPIOA, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO5); // PA.5
+  gpio_mode_setup(GPIOA, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO5);
   gpio_set_output_options(GPIOA, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ, GPIO5);
 }

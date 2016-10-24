@@ -4,54 +4,50 @@
 
 LedTickState g_LedTick;
 
-static void led_power_init(void);
-static void led_timer_init(void);
-static void hc595_init(void);
-static void hc595_send(uint32_t bits);
+static void ledPowerGpioConfigure(uint32_t rcc, uint32_t port, uint16_t pin);
+static void powerGpioSetup(void);
+static void powerPwmSetup(void);
+static void hc595Init(void);
+static void hc595Send(uint32_t bits);
 
-void leds_init(void) {
+void led_Init(void) {
   LedTickState *ledTick = &g_LedTick;
 
   ledTick->enabled = false;
   ledTick->ticks = 0;
   ledTick->speed = 0;
 
-  hc595_init();     // Init the shift register
-  leds_shift(0);    // Reset leds (off)
-  led_power_init(); // Init GPIOs that control led power.
-  led_timer_init(); // Timer manages led power output through PWM.
+  hc595Init();      // Init the shift register
+  led_Set(0);       // Reset leds (off)
+  powerGpioSetup(); // Init GPIOs that control led power.
+  powerPwmSetup();  // Timer manages led power output through PWM.
 }
 
-void leds_set_brightness(uint32_t red, uint32_t green, uint32_t blue) {
+void led_SetBrightness(uint32_t red, uint32_t green, uint32_t blue) {
   timer_set_oc_value(LED_TIMER, TIM_OC1, red);
   timer_set_oc_value(LED_TIMER, TIM_OC2, green);
   timer_set_oc_value(LED_TIMER, TIM_OC3, blue);
 }
 
-void leds_shift(uint32_t bits) { hc595_send(bits); }
+void led_Set(uint32_t bits) { hc595Send(bits); }
 
-static void led_power_init(void) {
-  rcc_periph_clock_enable(RCC_GPIOA);
-  rcc_periph_clock_enable(RCC_GPIOB);
+static void powerGpioSetup(void) {
+  ledPowerGpioConfigure(RCC_LED_RED, LED_RED_PORT, LED_RED_PIN);
+  ledPowerGpioConfigure(RCC_LED_GREEN, LED_GREEN_PORT, LED_GREEN_PIN);
+  ledPowerGpioConfigure(RCC_LED_BLUE, LED_BLUE_PORT, LED_BLUE_PIN);
+}
 
-  gpio_clear(GPIOA, GPIO6 | GPIO7);
-  gpio_clear(GPIOB, GPIO0); // LED (Blue)
+static void ledPowerGpioConfigure(uint32_t rcc, uint32_t port, uint16_t pin) {
+  rcc_periph_clock_enable(rcc);
+  gpio_clear(port, pin);
 
-  // PA.6 (Red, TIM3_CH1) & PA.7 (Green, TIM3_CH2)
-  gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO6 | GPIO7);
-  gpio_set_output_options(GPIOA, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ,
-                          GPIO6 | GPIO7);
-  gpio_set_af(GPIOA, GPIO_AF2, GPIO6 | GPIO7);
-
-  // PB.0 (Blue, TIM3_CH3)
-  gpio_mode_setup(GPIOB, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO6 | GPIO0);
-  gpio_set_output_options(GPIOB, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ,
-                          GPIO6 | GPIO0);
-  gpio_set_af(GPIOB, GPIO_AF2, GPIO6 | GPIO0);
+  gpio_mode_setup(port, GPIO_MODE_AF, GPIO_PUPD_NONE, pin);
+  gpio_set_output_options(port, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ, pin);
+  gpio_set_af(port, LED_AF, pin);
 }
 
 // Initialise the led timer for controlling the power output through PWM.
-static void led_timer_init(void) {
+static void powerPwmSetup(void) {
   rcc_periph_clock_enable(RCC_LED_TIMER);
 
   timer_reset(LED_TIMER);
@@ -101,28 +97,28 @@ void led_TickHandlerRecovery(uint32_t ticks) {
 
   switch ((ticks % 10)) {
   case 0:
-    leds_shift(0x01 << 16);
+    led_Set(0x01 << 16);
     break;
   case 1:
-    leds_shift(0x03 << 16);
+    led_Set(0x03 << 16);
     break;
   case 2:
-    leds_shift(0x07 << 16);
+    led_Set(0x07 << 16);
     break;
   case 3:
-    leds_shift(0x0F << 16);
+    led_Set(0x0F << 16);
     break;
   case 4:
-    leds_shift(0x1F << 16);
+    led_Set(0x1F << 16);
     break;
   case 5:
   case 7:
   case 9:
-    leds_shift(0x3F << 16);
+    led_Set(0x3F << 16);
     break;
   case 6:
   case 8:
-    leds_shift(0);
+    led_Set(0);
     break;
   }
 }
@@ -140,42 +136,42 @@ void led_SysTickHandler(uint32_t duration) {
   }
 }
 
-// Shift register initialisation for HC595.
-static void hc595_init(void) {
-  rcc_periph_clock_enable(RCC_GPIOC);
+// hc595Init initialises the HC595 shift registers, the bttn has three of them
+// chained together.
+static void hc595Init(void) {
+  rcc_periph_clock_enable(RCC_HC595);
 
-  gpio_clear(GPIOC, HC595_GPIOS);
+  gpio_clear(HC595_PORT, HC595_GPIOS);
 
-  gpio_mode_setup(GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, HC595_GPIOS);
-  gpio_set_output_options(GPIOC, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ, HC595_GPIOS);
+  gpio_mode_setup(HC595_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, HC595_GPIOS);
+  gpio_set_output_options(HC595_PORT, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ,
+                          HC595_GPIOS);
 }
 
-static void hc595_send(uint32_t bits) {
-  // There's only 3 shift registers
-  // daisy-chained, so 24 bits is
-  // the limit.
+// hc595Send sends up to twenty-four bits (eight per register) used to control
+// the bttn leds. When a bit is set, the corresponding led lights up.
+static void hc595Send(uint32_t bits) {
   uint8_t i;
+
+  // Three shift registers of eight bits each adds up to 24.
   for (i = 0; i < 24; i++) {
-    // If the bit is high, we clock
-    // low to turn led on.
+    // If the bit is high, we clock low to turn led on.
     if (bits & 0x800000) {
-      gpio_clear(GPIOC, HC595_DS);
+      gpio_clear(HC595_PORT, HC595_DS);
     } else {
-      gpio_set(GPIOC, HC595_DS);
+      gpio_set(HC595_PORT, HC595_DS);
     }
 
-    // Clock the current bit into the
-    // shift register.
-    gpio_set(GPIOC, HC595_SHCP);
-    gpio_clear(GPIOC, HC595_SHCP);
+    // Clock the current bit into the shift register.
+    gpio_set(HC595_PORT, HC595_SHCP);
+    gpio_clear(HC595_PORT, HC595_SHCP);
 
     bits <<= 1;
   }
 
-  // Clock the current bits into
-  // the storage register.
-  gpio_set(GPIOC, HC595_STCP);
-  gpio_clear(GPIOC, HC595_STCP);
+  // Clock the current bits into the storage register.
+  gpio_set(HC595_PORT, HC595_STCP);
+  gpio_clear(HC595_PORT, HC595_STCP);
 
-  gpio_clear(GPIOC, HC595_DS);
+  gpio_clear(HC595_PORT, HC595_DS);
 }

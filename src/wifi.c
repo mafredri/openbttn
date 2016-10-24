@@ -5,42 +5,42 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "debug.h"
 #include "util.h"
 #include "wifi.h"
 
-uint8_t g_WifiRingBuffSpace[RING_BUFF_SIZE];
-uint8_t g_WifiTmpBuff[WIFI_TMP_BUFF_SIZE];
-uint8_t g_WifiAtBuff[WIFI_AT_BUFF_SIZE];
+uint8_t g_wifiRingBuffSpace[RING_BUFF_SIZE];
+uint8_t g_wifiTmpBuff[WIFI_TMP_BUFF_SIZE];
+uint8_t g_wifiAtBuff[WIFI_AT_BUFF_SIZE];
 
-RingBufferType g_WifiRingBuff = {&g_WifiRingBuffSpace[0], 0, 0, 0};
-WifiAtType g_WifiAt = {AT_STATUS_CLEAR, &g_WifiAtBuff[0], 0, 0};
-WifiConfigType g_WifiConfig;
-WifiDataType g_WifiData;
+RingBuffer g_wifiRingBuff = {&g_wifiRingBuffSpace[0], 0, 0, 0};
+WifiAt g_wifiAt = {AT_STATUS_CLEAR, &g_wifiAtBuff[0], 0, 0};
+WifiConfig g_wifiConfig;
+WifiData g_wifiData;
 
-static void setupGpio(void);
-static void setupUsart(void);
-static void atReset(WifiAtType *at);
+static void gpioSetup(void);
+static void usartSetup(void);
+static void atReset(WifiAt *at);
 static bool processAsyncIndication(uint8_t *const buff, uint8_t data);
-static bool processWind(WifiStateType *state, uint8_t *const buff);
-static bool processAtResponse(WifiAtType *at, uint8_t data);
-static bool processCind(WifiConfigType *wifiConf, uint8_t *const buff);
+static bool processWind(volatile WifiState *state, uint8_t *const buff);
+static bool processAtResponse(WifiAt *at, uint8_t data);
+static bool processCind(WifiConfig *wifiConf, uint8_t *const buff);
 static uint16_t httpStatus(uint8_t *response);
-static void debugSend(char data);
 static void debugPrintBuffer(uint8_t *const buff, uint8_t prefix);
 
 // wifi_Init boots the WIFI module.
 void wifi_Init(void) {
-  WifiDataType *wifi = &g_WifiData;
+  WifiData *wifi = &g_wifiData;
 
-  setupGpio();
-  setupUsart();
+  gpioSetup();
+  usartSetup();
 
   wifi->state = WIFI_STATE_OFF;
   wifi->recv = RECV_ASYNC_INDICATION;
-  wifi->at = &g_WifiAt;
-  wifi->config = &g_WifiConfig;
-  wifi->ringBuff = &g_WifiRingBuff;
-  wifi->tmpBuff = &g_WifiTmpBuff[0];
+  wifi->at = &g_wifiAt;
+  wifi->config = &g_wifiConfig;
+  wifi->ringBuff = &g_wifiRingBuff;
+  wifi->tmpBuff = &g_wifiTmpBuff[0];
 
   wifi_PowerOn();
 }
@@ -48,12 +48,11 @@ void wifi_Init(void) {
 void wifi_PowerOn(void) { gpio_set(GPIOB, GPIO2); }
 void wifi_PowerOff(void) { gpio_clear(GPIOB, GPIO2); }
 void wifi_Send(char data) { usart_send_blocking(WIFI_USART, data); }
-static void debugSend(char data) { usart_send_blocking(DEBUG_USART, data); }
 
 // wifi_SoftReset executes the AT+CFUN command, issuing a reset, and waits for
 // the power on indication from the WIFI module.
 void wifi_SoftReset(void) {
-  WifiDataType *wifi = &g_WifiData;
+  WifiData *wifi = &g_wifiData;
 
   // We must wait for the console to be active.
   wifi_WaitState(WIFI_STATE_CONSOLE_ACTIVE);
@@ -66,7 +65,7 @@ void wifi_SoftReset(void) {
 }
 
 void wifi_HardReset(void) {
-  WifiDataType *wifi = &g_WifiData;
+  WifiData *wifi = &g_wifiData;
 
   wifi_PowerOff();
   delay(1000);
@@ -76,8 +75,8 @@ void wifi_HardReset(void) {
 }
 
 // wifi_WaitState waits until the WIFI module is in specified state.
-void wifi_WaitState(WifiStateType states) {
-  WifiDataType *wifi = &g_WifiData;
+void wifi_WaitState(WifiState states) {
+  WifiData *wifi = &g_wifiData;
 
   while ((wifi->state & states) == 0) {
     ;
@@ -90,8 +89,8 @@ void wifi_SendString(const char *str) {
   }
 }
 
-// setupGpio configures the GPIOs for settings up the USART.
-static void setupGpio(void) {
+// gpioSetup configures the GPIOs for settings up the USART.
+static void gpioSetup(void) {
   rcc_periph_clock_enable(RCC_WIFI_USART);
 
   gpio_mode_setup(WIFI_GPIO_PORT, GPIO_MODE_AF, GPIO_PUPD_NONE, WIFI_GPIO_TX);
@@ -106,8 +105,8 @@ static void setupGpio(void) {
   gpio_set_af(WIFI_GPIO_PORT, GPIO_AF7, WIFI_GPIO_RX);
 }
 
-// setupUsart configures the USART for communicating with the WIFI module.
-static void setupUsart(void) {
+// usartSetup configures the USART for communicating with the WIFI module.
+static void usartSetup(void) {
   usart_set_baudrate(WIFI_USART, 115200);
   usart_set_databits(WIFI_USART, 8);
   usart_set_stopbits(WIFI_USART, USART_STOPBITS_1);
@@ -129,7 +128,7 @@ static void setupUsart(void) {
 }
 
 void wifi_HandleChange(void) {
-  WifiDataType *wifi = &g_WifiData;
+  WifiData *wifi = &g_wifiData;
 
   if (wifi->config->changed) {
     wifi_ApplyConfig();
@@ -138,7 +137,7 @@ void wifi_HandleChange(void) {
 }
 
 // atReset resets the AT command state.
-static void atReset(WifiAtType *at) {
+static void atReset(WifiAt *at) {
   memset(at->buff, 0, WIFI_AT_BUFF_SIZE);
   at->status = AT_STATUS_CLEAR;
   at->last_cr_lf = 0;
@@ -148,7 +147,7 @@ static void atReset(WifiAtType *at) {
 // wifi_AtCmdWait waits until we recieve the entire AT response and returns true
 // if there was no error, otherwise false.
 bool wifi_AtCmdWait(void) {
-  WifiDataType *wifi = &g_WifiData;
+  WifiData *wifi = &g_wifiData;
 
   while ((wifi->at->status & AT_STATUS_READY) == 0) {
     ;
@@ -160,7 +159,7 @@ bool wifi_AtCmdWait(void) {
 void wifi_AtCmdN(int n, ...) {
   va_list args;
   int i;
-  WifiDataType *wifi = &g_WifiData;
+  WifiData *wifi = &g_wifiData;
 
   wifi_WaitState(WIFI_STATE_CONSOLE_ACTIVE);
   atReset(wifi->at);
@@ -193,7 +192,7 @@ bool wifi_AtCmdBlocking(char *str) {
 // wifi_HttpGet performs a blocking HTTP GET request and returns the http status
 // code returned by the server.
 uint16_t wifi_HttpGet(char *url) {
-  WifiDataType *wifi = &g_WifiData;
+  WifiData *wifi = &g_wifiData;
 
   wifi_AtCmdN(2, "AT+S.HTTPGET=", url);
 
@@ -210,7 +209,7 @@ uint16_t wifi_HttpGet(char *url) {
 }
 
 void wifi_GetSsid(char *dest, size_t len) {
-  WifiDataType *wifi = &g_WifiData;
+  WifiData *wifi = &g_wifiData;
   char *s;
 
   assert(len >= 32);
@@ -296,7 +295,7 @@ void wifi_EnableFirstConfig(const char *ssid, const char *password) {
 // wifi_ApplyConfig.
 // TODO: Handle Open and WEP priv_mode.
 void wifi_ApplyConfig(void) {
-  WifiDataType *wifi = &g_WifiData;
+  WifiData *wifi = &g_wifiData;
 
   wifi_AtCmdBlocking("AT&F");                  // Factory reset.
   wifi_AtCmdBlocking("AT+S.SCFG=wifi_mode,1"); // Station mode.
@@ -346,7 +345,7 @@ void wifi_ApplyConfig(void) {
 // to the current wifi_RecvState. Only one char is processed per tick, except
 // when AT_STATUS_FAST_PROCESS is enabled.
 void wifi_SysTickHandler(void) {
-  WifiDataType *wifi = &g_WifiData;
+  WifiData *wifi = &g_wifiData;
   uint8_t data;
   bool status;
 
@@ -395,7 +394,7 @@ process_loop:
 // WIFI_ISR handles interrupts from the WIFI module and stores the data in a
 // ring buffer.
 void WIFI_ISR(void) {
-  WifiDataType *wifi = &g_WifiData;
+  WifiData *wifi = &g_wifiData;
 
   if (usart_get_flag(WIFI_USART, USART_SR_RXNE)) {
     uint8_t data;
@@ -433,7 +432,7 @@ static bool processAsyncIndication(uint8_t *const buff, uint8_t data) {
 // processAtResponse processes the data in the provided at buffer and
 // indicates whether or not the entire response has been received, the AT status
 // is updated accordingly.
-static bool processAtResponse(WifiAtType *at, uint8_t data) {
+static bool processAtResponse(WifiAt *at, uint8_t data) {
   at->buff[at->pos++] = data;
 
   // A response must always end at a "\r\n", by skipping len under the minimum
@@ -467,8 +466,8 @@ static bool processAtResponse(WifiAtType *at, uint8_t data) {
 
 // processWind consumes a buffer containing WIND and updates the state if
 // a handled WIND ID is found.
-static bool processWind(WifiStateType *state, uint8_t *const buff) {
-  WifiWindType wind = WIND_UNDEFINED;
+static bool processWind(volatile WifiState *state, uint8_t *const buff) {
+  WifiWind wind = WIND_UNDEFINED;
 
   char *windStart = strstr((const char *)buff, "+WIND:");
   if (windStart) {
@@ -511,10 +510,10 @@ static bool processWind(WifiStateType *state, uint8_t *const buff) {
 
 // processCind consumes a buffer containing CIND (custom indication) and
 // enables remote management of the bttn.
-static bool processCind(WifiConfigType *wifiConfig, uint8_t *const buff) {
+static bool processCind(WifiConfig *wifiConfig, uint8_t *const buff) {
   char text[WIFI_CIND_TEXT_LENGTH];
   char *const pText = &text[0];
-  WifiCindType cind = CIND_UNDEF;
+  WifiCind cind = CIND_UNDEF;
 
   char *cindStart = strstr((const char *)buff, "+CIND:");
   if (cindStart) {
@@ -616,22 +615,22 @@ static uint16_t httpStatus(uint8_t *response) {
 static void debugPrintBuffer(uint8_t *const buff, uint8_t prefix) {
   uint8_t *ptr = &buff[0];
 
-  debugSend(prefix);
-  debugSend('>');
+  debug_Send(prefix);
+  debug_Send('>');
 
   while (*ptr) {
     if (*ptr == '\r') {
-      debugSend('\\');
-      debugSend('r');
+      debug_Send('\\');
+      debug_Send('r');
     } else if (*ptr == '\n') {
-      debugSend('\\');
-      debugSend('n');
+      debug_Send('\\');
+      debug_Send('n');
     } else {
-      debugSend(*ptr);
+      debug_Send(*ptr);
     }
     ptr++;
   }
 
-  debugSend('\r');
-  debugSend('\n');
+  debug_Send('\r');
+  debug_Send('\n');
 }

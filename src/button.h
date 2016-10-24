@@ -10,9 +10,9 @@
 #define BUTTON_ISR exti15_10_isr
 #define BUTTON_NVIC NVIC_EXTI15_10_IRQ
 
-extern volatile bool g_ButtonPressed;
+extern volatile bool g_buttonPressed;
 
-void button_enable(void);
+void button_Init(void);
 uint32_t button_PressedDuration(void);
 
 #endif /* BUTTON_H */

@@ -2,10 +2,10 @@
 
 #include "button.h"
 
-volatile bool g_ButtonPressed = false;
+volatile bool g_buttonPressed = false;
 
-void button_enable(void) {
-  g_ButtonPressed = false;
+void button_Init(void) {
+  g_buttonPressed = false;
 
   rcc_periph_clock_enable(RCC_GPIOC);
   rcc_periph_clock_enable(RCC_SYSCFG);
@@ -29,6 +29,6 @@ uint32_t button_PressedDuration(void) { return g_SystemTick; }
 void BUTTON_ISR(void) {
   if (exti_get_flag_status(EXTI13)) {
     exti_reset_request(EXTI13);
-    g_ButtonPressed = true;
+    g_buttonPressed = true;
   }
 }
