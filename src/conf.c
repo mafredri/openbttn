@@ -90,11 +90,12 @@ void *conf_Get(ConfigType type) {
   return 0;
 }
 
-void conf_SetTempPassword(const char *password) {
+void conf_SetPassword(const char *password) {
   Config *config = &g_Config;
 
   memset(config->data->password, 0, CONF_PASSWORD_LENGTH);
   strncpy(config->data->password, password, CONF_PASSWORD_LENGTH);
+  config->commit = true;
 }
 
 void conf_Set(ConfigType type, const void *value) {
@@ -111,17 +112,18 @@ void conf_Set(ConfigType type, const void *value) {
     strncpy(config->data->url1, (char *)value, CONF_URL_LENGTH);
     config->updated = true;
     break;
+
   case CONF_URL2:
     memset(config->data->url2, 0, CONF_URL_LENGTH);
     strncpy(config->data->url2, (char *)value, CONF_URL_LENGTH);
     config->updated = true;
     break;
+
+  // Password can only be set through conf_SetPassword.
   case CONF_PASSWORD:
-    memset(config->data->password, 0, CONF_PASSWORD_LENGTH);
-    strncpy(config->data->password, (char *)value, CONF_PASSWORD_LENGTH);
-    config->updated = true;
-    config->commit = true; // Always commit a password change.
+    printf("Password can not be set from conf_Set!\n");
     break;
+
   default:
     printf("Unhandled config type!\n");
     break;
@@ -146,7 +148,7 @@ void conf_CreateConfigJson(void) {
 
   sprintf(&data[0], configJson, config->data->url1, config->data->url2);
 
-  wifi_CreateFileInRam("config.json", "application/json", &data[0],
+  wifi_CreateFileInRam("config.json", "application/json", "identity", &data[0],
                        strlen(data));
 }
 
@@ -169,8 +171,8 @@ void conf_HandleChange(void) {
   }
   if (config->commit) {
     config->commit = false;
-    delay(1000);           // Long debounce for commits.
-    if (!config->commit) { // No commit in 1s.
+    delay(500);            // Long debounce for commits.
+    if (!config->commit) { // No commit in 500ms.
       conf_Commit();
       printf("Config committed!\n");
     }
@@ -179,7 +181,7 @@ void conf_HandleChange(void) {
   // The configuration should not remain unlocked indefinitely, unless a new
   // update is received ,
   if (config->unlocked) {
-    delay(1000);
+    delay(500);
     if (!config->updated) {
       config->unlocked = false;
       printf("Config locked!\n");
