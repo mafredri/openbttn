@@ -233,20 +233,25 @@ const char httpFileHeader[] = "HTTP/1.1 200 OK\n"
                               "Server: OpenBttn\n"
                               "Connection: close\n"
                               "Content-Type: %s\n"
+                              "Content-Encoding: %s\n"
                               "Content-Length: %d\n\n";
 
 void wifi_CreateFileInRam(const char *name, const char *contentType,
-                          const char *data, uint16_t len) {
-  char header[strlen(httpFileHeader) + 20 + 4 + 1];
+                          const char *contentEnc, const char *data,
+                          uint16_t contentLen) {
+  // Header length + content type (e.g. text/html or application/json) + content
+  // encoding (e.g. gzip or identity) + content length (< 4096).
+  char header[strlen(httpFileHeader) + 20 + 8 + 4 + 1];
   char fileSizeStr[5 + 1];
   uint16_t i;
   uint16_t fileSize;
 
   assert(strlen(contentType) <= 20);
-  assert(len < WIFI_FILE_MAX_SIZE);
+  assert(strlen(contentEnc) <= 8);
+  assert(contentLen < WIFI_FILE_MAX_SIZE);
 
-  sprintf(&header[0], httpFileHeader, contentType, len);
-  fileSize = strlen(header) + len;
+  sprintf(&header[0], httpFileHeader, contentType, contentEnc, contentLen);
+  fileSize = strlen(header) + contentLen;
 
   assert(fileSize <= WIFI_FILE_MAX_SIZE);
 
@@ -265,7 +270,7 @@ void wifi_CreateFileInRam(const char *name, const char *contentType,
   for (i = 0; i < strlen(header); i++) {
     wifi_Send(header[i]);
   }
-  for (i = 0; i < len; i++) {
+  for (i = 0; i < contentLen; i++) {
     wifi_Send(data[i]);
   }
 

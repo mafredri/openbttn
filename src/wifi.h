@@ -147,7 +147,8 @@ uint16_t wifi_HttpGet(char *url);
 void wifi_GetSsid(char *dest, size_t len);
 void wifi_EnableFirstConfig(const char *ssid, const char *password);
 void wifi_CreateFileInRam(const char *name, const char *contentType,
-                          const char *data, uint16_t contentLength);
+                          const char *contentEnc, const char *data,
+                          uint16_t contentLen);
 void wifi_ApplyConfig(void);
 void wifi_SysTickHandler(void);
 
