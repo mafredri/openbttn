@@ -14,8 +14,9 @@ void led_Init(void) {
   LedTickState *ledTick = &g_LedTick;
 
   ledTick->enabled = false;
-  ledTick->ticks = 0;
   ledTick->speed = 0;
+  ledTick->ticks = 0;
+  ledTick->startTick = 0;
 
   hc595Init();      // Init the shift register
   led_Set(0);       // Reset leds (off)
@@ -79,10 +80,13 @@ static void powerPwmSetup(void) {
   timer_enable_counter(LED_TIMER);
 }
 
-void led_TickConfigure(uint16_t speed, LedToggleHandler toggleFunc) {
+void led_TickConfigure(uint16_t speed, uint32_t startTick,
+                       LedToggleHandler toggleFunc) {
   LedTickState *ledTick = &g_LedTick;
   ledTick->speed = speed;
+  ledTick->startTick = startTick;
   ledTick->toggleFunc = toggleFunc;
+  ledTick->init = false;
 }
 
 void led_TickEnable(void) {
@@ -91,11 +95,7 @@ void led_TickEnable(void) {
 }
 
 void led_TickHandlerRecovery(uint32_t ticks) {
-  if (ticks >= 10) {
-    return;
-  }
-
-  switch ((ticks % 10)) {
+  switch ((ticks % 6)) {
   case 0:
     led_Set(0x01 << 16);
     break;
@@ -112,12 +112,132 @@ void led_TickHandlerRecovery(uint32_t ticks) {
     led_Set(0x1F << 16);
     break;
   case 5:
-  case 7:
-  case 9:
     led_Set(0x3F << 16);
     break;
-  case 6:
-  case 8:
+  }
+}
+
+void led_TickHandlerRecoveryInit(uint32_t ticks) {
+  switch ((ticks % 2)) {
+  case 0:
+    led_Set(0x3F << 16);
+    break;
+  case 1:
+    led_Set(0);
+    break;
+  }
+}
+
+void led_TickHandlerRecoveryLoading(uint32_t ticks) {
+  switch ((ticks % 6)) {
+  case 0:
+    led_Set((0x01 << 16) | (0x01 << 8) | (0x01 << 0));
+    break;
+  case 1:
+    led_Set((0x02 << 16) | (0x02 << 8) | (0x02 << 0));
+    break;
+  case 2:
+    led_Set((0x04 << 16) | (0x04 << 8) | (0x04 << 0));
+    break;
+  case 3:
+    led_Set((0x08 << 16) | (0x08 << 8) | (0x08 << 0));
+    break;
+  case 4:
+    led_Set((0x10 << 16) | (0x10 << 8) | (0x10 << 0));
+    break;
+  case 5:
+    led_Set((0x20 << 16) | (0x20 << 8) | (0x20 << 0));
+    break;
+  }
+}
+
+void led_TickHandlerError(uint32_t ticks) {
+  switch ((ticks % 4)) {
+  case 0:
+  case 1:
+  case 2:
+    led_Set(0x3F << 0);
+    break;
+  case 3:
+    led_Set(0);
+    break;
+  }
+}
+
+void led_TickHandlerBoot(uint32_t ticks) {
+  switch ((ticks % 2)) {
+  case 0:
+    led_Set(0x3F << 8);
+    break;
+  case 1:
+    led_Set(0);
+    break;
+  }
+}
+
+void led_TickHandlerPending(uint32_t ticks) {
+  switch ((ticks % 2)) {
+  case 0:
+    led_Set(0x3F << 8);
+    break;
+  case 1:
+    led_Set(0);
+    break;
+  }
+}
+
+void led_TickHandlerGreenCircleFill(uint32_t ticks) {
+  switch ((ticks % 6)) {
+  case 0:
+    led_Set(0x01 << 8);
+    break;
+  case 1:
+    led_Set(0x03 << 8);
+    break;
+  case 2:
+    led_Set(0x07 << 8);
+    break;
+  case 3:
+    led_Set(0x0F << 8);
+    break;
+  case 4:
+    led_Set(0x1F << 8);
+    break;
+  case 5:
+    led_Set(0x3F << 8);
+    break;
+  }
+}
+
+void led_TickHandlerGreenLoading(uint32_t ticks) {
+  switch ((ticks % 6)) {
+  case 0:
+    led_Set(0x01 << 8);
+    break;
+  case 1:
+    led_Set(0x02 << 8);
+    break;
+  case 2:
+    led_Set(0x04 << 8);
+    break;
+  case 3:
+    led_Set(0x08 << 8);
+    break;
+  case 4:
+    led_Set(0x10 << 8);
+    break;
+  case 5:
+    led_Set(0x20 << 8);
+    break;
+  }
+}
+
+void led_TickHandlerGreenSuccess(uint32_t ticks) {
+  switch ((ticks % 2)) {
+  case 0:
+    led_Set(0x3F << 8);
+    break;
+  case 1:
     led_Set(0);
     break;
   }
@@ -130,9 +250,14 @@ void led_TickDisable(void) {
 
 void led_SysTickHandler(uint32_t duration) {
   LedTickState *ledTick = &g_LedTick;
-
-  if (ledTick->enabled && ((duration % ledTick->speed) == 0)) {
-    (*ledTick->toggleFunc)(ledTick->ticks++);
+  if (ledTick->enabled) {
+    uint32_t newTicks =
+        ((duration - ledTick->startTick) / (uint32_t)ledTick->speed);
+    if (newTicks != ledTick->ticks || !ledTick->init) {
+      ledTick->init = true;
+      ledTick->ticks = newTicks;
+      (*ledTick->toggleFunc)(ledTick->ticks);
+    }
   }
 }
 

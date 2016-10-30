@@ -35,19 +35,30 @@ typedef struct LedTickState LedTickState;
 struct LedTickState {
   volatile uint16_t speed;
   volatile uint32_t ticks;
+  uint32_t startTick;
   LedToggleHandler toggleFunc;
   volatile bool enabled;
+  volatile bool init;
 };
 
 void led_Init(void);
 void led_SetBrightness(uint32_t red, uint32_t green, uint32_t blue);
 void led_Set(uint32_t bits);
 
-void led_TickConfigure(uint16_t speed, LedToggleHandler handler);
+void led_TickConfigure(uint16_t speed, uint32_t startTick,
+                       LedToggleHandler handler);
 void led_TickEnable(void);
 void led_TickDisable(void);
 
+void led_TickHandlerRecoveryInit(uint32_t ticks);
 void led_TickHandlerRecovery(uint32_t ticks);
+void led_TickHandlerRecoveryLoading(uint32_t ticks);
+void led_TickHandlerError(uint32_t ticks);
+void led_TickHandlerPending(uint32_t ticks);
+void led_TickHandlerGreenCircleFill(uint32_t ticks);
+void led_TickHandlerGreenLoading(uint32_t ticks);
+void led_TickHandlerGreenSuccess(uint32_t ticks);
+void led_TickHandlerBoot(uint32_t ticks);
 
 void led_SysTickHandler(uint32_t duration);
 
