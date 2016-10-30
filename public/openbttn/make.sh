@@ -6,10 +6,10 @@ SCRIPT=${0:A:h}
 TMP=$(mktemp -d -t openbttn)
 path=($SCRIPT/node_modules/.bin $path)
 
-(cd -q $SCRIPT; cp *.html *.js $TMP)
+(cd -q $SCRIPT; cp *.html *.js *.css $TMP)
 (cd -q $TMP;
 	for js in *.js; do
-		uglifyjs --mangle --compress --quotes 3 $js -o $js
+		uglifyjs --enclose --mangle --compress --quotes 3 $js -o $js
 		cat $js
 	done
 
@@ -20,7 +20,6 @@ path=($SCRIPT/node_modules/.bin $path)
 		html-minifier \
 			--html5 \
 			--collapse-whitespace \
-			--collapse-inline-tag-whitespace \
 			--remove-attribute-quotes \
 			--remove-comments \
 			--minify-css \
@@ -34,7 +33,8 @@ path=($SCRIPT/node_modules/.bin $path)
 
 	print
 	for html in *.html; do
-		xxd -i $html > $html.xxd
+		gzip -9 $html
+		xxd -i $html.gz > $html.xxd
 		grep -v "^unsigned int" $html.xxd >> $html.c
 
 		name=$(head -n1 $html.c)

@@ -4,4 +4,5 @@
 *.d
 *.map
 *.bin
-public/node_modules
+**/node_modules
+public/ota/*.ota

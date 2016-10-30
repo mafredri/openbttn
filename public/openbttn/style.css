@@ -1,0 +1,46 @@
+body {
+    font-family: Helvetica, Arial, sans-serif;
+    text-align: center;
+    font-size: 14px;
+    background-color:#e7e7e7;
+    color: #012210;
+}
+
+table {
+    margin: 0 auto;
+}
+
+td:first-child {
+    text-align: right;
+    padding-right: 4px;
+}
+
+td:last-child {
+    text-align: left;
+}
+
+tr:last-child td {
+    text-align: right;
+}
+
+p {
+    margin: 0 auto;
+    padding: 10px;
+    width: 400px;
+}
+
+.hidden {
+    display: none;
+}
+
+.warn {
+    background-color: #ff6262;
+}
+
+ul {
+    list-style-position: inside;
+}
+
+a {
+    color: #555
+}

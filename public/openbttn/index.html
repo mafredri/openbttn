@@ -3,11 +3,7 @@
 
 <head>
 	<title>OpenBttn</title>
-	<style>
-		.actions {
-			text-align: right;
-		}
-	</style>
+	<link rel="stylesheet" href="./style.css">
 </head>
 
 <body>
@@ -16,20 +12,20 @@
 		<table>
 			<tr>
 				<td>Authentication:</td>
-				<td><input name="auth" type="password" size="25"></td>
+				<td><input id="auth" type="password" size="25"></td>
 			</tr>
 			<tr>
 				<td>Button URL:</td>
-				<td><input name="url1" type="url" value="http://" size="25"></td>
+				<td><input id="url1" type="url" value="http://" size="25"></td>
 			</tr>
 			<tr>
 				<td>Long press URL:</td>
-				<td><input name="url2" type="url" value="http://" size="25"></td>
+				<td><input id="url2" type="url" value="http://" size="25"></td>
 			</tr>
 			<tr class="actions">
 				<td colspan="2">
-					<input name="apply" type="submit" value="Apply">
-					<input name="commit" type="submit" value="Save">
+					<input id="apply" type="submit" value="Apply">
+					<input id="commit" type="submit" value="Save">
 				</td>
 			</tr>
 		</table>
@@ -41,7 +37,10 @@
 	<p>
 		<a href="/config.shtml">Config</a> <a href="/status.shtml">Status</a> <a href="/peers.shtml">Peers</a>
 	</p>
-	<script src="./src.js"></script>
+	<script src="./cind.js"></script>
+	<script src="./at.js"></script>
+	<script src="./form.js"></script>
+	<script src="./index.js"></script>
 </body>
 
 </html>

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="UTF-8">
+	<title>First Config - OpenBttn</title>
+	<link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+	<h1>OpenBttn: First Config</h1>
+	<div id="fw">
+		<h2>Firmware Upgrade (SPWF01SA)</h2>
+		<form id="fw-form">
+			<p>
+				<strong>Current firmware:</strong> <span id="fw-ver"></span><br>
+				It is highly recommended that you upgrade the SPWF01SA firmware. The latest firmware can be found <a href="https://goo.gl/f9RmrE">here</a> (requires login).
+			</p>
+			<table>
+				<tr>
+					<td>URL:</td>
+					<td><input type="url" id="ota" value="http://192.168.1.2:8774/ota/SPWF01S-160129-c5bf5ce-RELEASE-main.ota" size="60"></td>
+				</tr>
+				<tr>
+					<td></td>
+					<td><input type="submit" value="Upgrade"></td>
+				</tr>
+			</table>
+		</form>
+	</div>
+
+	<div id="conf">
+		<h2>System configuration</h2>
+		<form>
+			<table>
+				<tr>
+					<td>Wireless network:</td>
+					<td><input type="text" id="ssid" placeholder="SSID" size="25"></td>
+				</tr>
+				<tr>
+					<td>Password:</td>
+					<td><input type="password" id="password" size="25"></td>
+				</tr>
+				<tr>
+					<td>Authentication:</td>
+					<td>
+						<select id="priv_mode">
+							<option value="0" disabled>Open</option>
+							<option value="1" disabled>WEP</option>
+							<option value="2" selected>WPA & WPA2 Personal</option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<td>Wireless mode:</td>
+					<td>
+						<select id="wifi_mode">
+							<option value="0">B/G</option>
+							<option value="1" selected>N</option>
+						</select>
+					</td>
+				</td>
+				<tr>
+					<td>DHCP:</td>
+					<td>
+						<select id="dhcp" id="dhcp">
+							<option value="1" selected>ON</option>
+							<option value="0">OFF</option>
+						</select>
+					</td>
+				</tr>
+				<tr class="static hidden">
+					<td>Static IP:</td>
+					<td><input type="text" id="ip_addr" placeholder="192.168.1.100" size="15"></td>
+				</tr>
+				<tr class="static hidden">
+					<td>Static Netmask:</td>
+					<td><input type="text" id="ip_netmask" placeholder="255.255.255.0" size="15"></td>
+				</tr>
+				<tr class="static hidden">
+					<td>Static Gateway:</td>
+					<td><input type="text" id="ip_gateway" placeholder="192.168.1.1" size="15"></td>
+				</tr>
+				<tr class="static hidden">
+					<td>Static DNS:</td>
+					<td><input type="text" id="ip_dns" placeholder="192.168.1.1" size="15"></td>
+				</tr>
+				<tr>
+					<td>Config password:</td>
+					<td><input type="password" id="user_desc" size="25" title="The config password is used when configuring the bttn in normal operation."></td>
+				</tr>
+				<tr>
+					<td></td>
+					<td><input type="submit" id="commit" value="Save"></td>
+				</tr>
+			</table>
+		</form>
+	</div>
+	<script src="./cind.js"></script>
+	<script src="./at.js"></script>
+	<script src="./form.js"></script>
+	<script src="./firstset.js"></script>
+</body>
+</html>
