@@ -6,3 +6,4 @@
 *.bin
 **/node_modules
 public/ota/*.ota
+cmd/openbttn/openbttn
