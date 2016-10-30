@@ -68,6 +68,7 @@ int main(void) {
                             &led_TickHandlerRecoveryLoading);
           led_TickEnable();
 
+          // TODO: Avoid using g_wifiData here, refactor into wifi_ApplyOta()?
           if (!wifi_OtaUpdate(g_wifiData.config->otaUrl)) {
             printf("Failed to perform OTA update on WiFi module!\n");
             led_TickDisable();
