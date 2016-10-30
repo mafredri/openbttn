@@ -21,8 +21,10 @@
 #define WIFI_TMP_BUFF_SIZE 1024 // Used for WIND (WIFI indication).
 #endif
 #ifndef WIFI_AT_BUFF_SIZE
-#define WIFI_AT_BUFF_SIZE (1024) // Used for AT / HTTP responses.
+#define WIFI_AT_BUFF_SIZE 1024 // Used for AT / HTTP responses.
 #endif
+#define WIFI_AT_BUFF_SIZE_HALF (WIFI_AT_BUFF_SIZE / 2)
+#define WIFI_AT_BUFF_SIZE_FOURTH (WIFI_AT_BUFF_SIZE_HALF / 2)
 
 #define WIFI_STATE_OFF (uint16_t)(0)
 #define WIFI_STATE_POWER_ON (uint16_t)(1 << 1)
@@ -30,6 +32,7 @@
 #define WIFI_STATE_JOINED (uint16_t)(1 << 3)
 #define WIFI_STATE_ASSOCIATED (uint16_t)(1 << 4)
 #define WIFI_STATE_UP (uint16_t)(1 << 5)
+#define WIFI_STATE_FW_UPDATE_COMPLETE (uint16_t)(1 << 6)
 
 #define AT_STATUS_CLEAR (uint8_t)(0)
 #define AT_STATUS_PENDING (uint8_t)(1 << 1)
@@ -50,6 +53,9 @@
 #define WIFI_PROCESS_COMPLETE true
 #define WIFI_PROCESS_INCOMPLETE false
 
+#define WIFI_CIND_TEXT_LENGTH 120
+#define WIFI_CIND_MESSAGE_LENGTH (WIFI_CIND_TEXT_LENGTH - 9) // +CIND:00:
+
 typedef uint16_t WifiState;
 
 typedef enum WifiRecv WifiRecv;
@@ -68,17 +74,19 @@ struct WifiAt {
 
 typedef struct WifiConfig WifiConfig;
 struct WifiConfig {
+  char otaUrl[WIFI_CIND_MESSAGE_LENGTH + 1];
   char userDesc[WIFI_CONFIG_USER_DESC_LENGTH + 1];
   char ssid[WIFI_CONFIG_SSID_LENGTH + 1];
   char password[WIFI_CONFIG_PASSWORD_LENGTH + 1];
   uint8_t privMode;
+  uint8_t wifiMode;
   uint8_t dhcp;
   uint32_t ipAddr;
   uint32_t ipNetmask;
   uint32_t ipGateway;
   uint32_t ipDns;
-  bool changed;
-  bool authenticated;
+  bool commit;
+  bool otaPending;
 };
 
 typedef struct WifiData WifiData;
@@ -89,6 +97,7 @@ struct WifiData {
   WifiConfig *config;
   RingBuffer *ringBuff;
   uint8_t *tmpBuff;
+  bool inRecovery;
 };
 
 // WIND IDs as handled by the application.
@@ -97,14 +106,12 @@ enum WifiWind {
   WIND_CONSOLE_ACTIVE = 0,   // Console active, can accept AT commands.
   WIND_POWER_ON = 1,         // Power on (also after reset).
   WIND_RESET = 2,            // Module will reset.
+  WIND_FW_UPDATE = 17,       // Firmware update in progress (status).
   WIND_WIFI_JOINED = 19,     // Join BSSID (AP MAC).
   WIND_WIFI_UP = 24,         // Connected with IP.
   WIND_WIFI_ASSOCIATED = 25, // Successfull association with SSID.
   WIND_UNDEFINED = 0xFF,     // Undefined state.
 };
-
-#define WIFI_CIND_TEXT_LENGTH 120
-#define WIFI_CIND_MESSAGE_LENGTH (WIFI_CIND_TEXT_LENGTH - 9) // +CIND:00:
 
 // Custom messages for the openbttn firmware.
 typedef enum WifiCind WifiCind;
@@ -113,19 +120,25 @@ enum WifiCind {
   CIND_COMMIT_CONFIG = 1, // Commit configuration changes to EEPROM.
   CIND_SET_URL1 = 2,      // Set URL1 message.
   CIND_SET_URL2 = 3,      // Set URL2 message.
+  CIND_UNDEF = 0xFF,      // Undefined message.
+};
 
-  // Configuration for the SPWF01SA WIFI module.
-  CIND_SET_USER_DESC = 20, // Set system authentication password.
-  CIND_SET_SSID = 21,
-  CIND_SET_PASSWORD = 22,
-  CIND_SET_PRIV_MODE = 23,
-  CIND_SET_DHCP = 24,
-  CIND_SET_IP_ADDR = 25,
-  CIND_SET_IP_NETMASK = 26,
-  CIND_SET_IP_GATEWAY = 27,
-  CIND_SET_IP_DNS = 28,
-  CIND_WIFI_COMMIT = 29,
-  CIND_UNDEF = 0xFF, // Undefined message.
+typedef enum WifiRecoveryCind WifiRecoveryCind;
+enum WifiRecoveryCind {
+  RECOVERY_CIND_SET_USER_DESC = 0, // Set system authentication password.
+  RECOVERY_CIND_SET_SSID = 1,
+  RECOVERY_CIND_SET_PASSWORD = 2,
+  RECOVERY_CIND_SET_PRIV_MODE = 3,
+  RECOVERY_CIND_SET_DHCP = 4,
+  RECOVERY_CIND_SET_IP_ADDR = 5,
+  RECOVERY_CIND_SET_IP_NETMASK = 6,
+  RECOVERY_CIND_SET_IP_GATEWAY = 7,
+  RECOVERY_CIND_SET_IP_DNS = 8,
+  RECOVERY_CIND_SET_WIFI_MODE = 9,
+
+  RECOVERY_CIND_COMMIT = 20,
+  RECOVERY_CIND_OTA_UPDATE = 21,
+  RECOVERY_CIND_UNDEF = 0xFF, // Undefined message.
 };
 
 extern WifiData g_wifiData;
@@ -136,7 +149,10 @@ void wifi_PowerOff(void);
 void wifi_SoftReset(void);
 void wifi_HardReset(void);
 void wifi_WaitState(WifiState states);
-void wifi_HandleChange(void);
+void wifi_EnableRecovery(void);
+void wifi_DisableRecovery(void);
+bool wifi_RecoveryOtaRequested(void);
+bool wifi_RecoveryCommitRequested(void);
 void wifi_AtCmdN(int n, ...);
 void wifi_AtCmd(char *str);
 bool wifi_AtCmdBlocking(char *str);
@@ -145,11 +161,12 @@ void wifi_Send(char data);
 void wifi_SendString(const char *str);
 uint16_t wifi_HttpGet(char *url);
 void wifi_GetSsid(char *dest, size_t len);
-void wifi_EnableFirstConfig(const char *ssid, const char *password);
+void wifi_EnableFirstConfig(const char *ssid);
 void wifi_CreateFileInRam(const char *name, const char *contentType,
                           const char *contentEnc, const char *data,
                           uint16_t contentLen);
 void wifi_ApplyConfig(void);
+bool wifi_OtaUpdate(char *url);
 void wifi_SysTickHandler(void);
 
 #endif /* WIFI_H */
