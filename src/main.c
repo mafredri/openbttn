@@ -12,6 +12,8 @@
 volatile uint32_t g_SystemTick = 0;
 volatile uint32_t g_SystemDelay = 0;
 
+void enterRecovery(void);
+void exitRecovery(void);
 static void clockSetup(void);
 static void gpioSetup(void);
 
@@ -42,49 +44,118 @@ int main(void) {
 
   conf_Init();
 
-  if (g_buttonPressed || gpio_get(BUTTON_GPIO_PORT, BUTTON_PIN_IT)) {
-    led_TickConfigure(500, &led_TickHandlerRecovery);
+  if (button_IsPressed()) {
+    // Tick speed 800, handler uses 6 ticks and we trigger already on 5th. This
+    // gives us recovery after 4000ms (1000 * 5 = 4000ms).
+    led_TickConfigure(800, g_SystemTick, &led_TickHandlerRecovery);
     led_TickEnable();
 
-    conf_SetTempPassword("openbttn1337");
-    wifi_EnableFirstConfig("openbttn", "openbttn1337");
-    wifi_WaitState(WIFI_STATE_UP);
-    wifi_CreateFileInRam("firstset.html", "text/html",
-                         (char *)&g_DataFirstsetHtml[0],
-                         DATA_FIRSTSET_HTML_LENGTH);
-
-    // TODO: Escape!
-    while (1) {
-      conf_HandleChange();
-      wifi_HandleChange();
+    // Wait until button is released or 4000ms has passed.
+    while (button_IsPressed() && button_PressedDuration() < 4000) {
+      ;
     }
 
     led_TickDisable();
-  } else {
-    // Show blue light until WIFI is ready.
-    led_Set(0xff0000);
+
+    // Recovery mode is entered after the button is pressed for 4000ms or more
+    // during initial boot.
+    if (button_PressedDuration() >= 4000) {
+      enterRecovery();
+
+      while (1) {
+        if (wifi_RecoveryOtaRequested()) {
+          led_TickConfigure(1000, g_SystemTick,
+                            &led_TickHandlerRecoveryLoading);
+          led_TickEnable();
+
+          if (!wifi_OtaUpdate(g_wifiData.config->otaUrl)) {
+            printf("Failed to perform OTA update on WiFi module!\n");
+            led_TickDisable();
+            led_TickConfigure(200, g_SystemTick, &led_TickHandlerError);
+            led_TickEnable();
+
+            wifi_HardReset(); // Power cycle the Wi-Fi module just in case.
+
+            delay(4000);
+          } else {
+            led_TickDisable();
+            led_Set((0x3F << 8));
+
+            delay(5000);
+          }
+
+          led_TickDisable();
+          led_Set(0);
+
+          // Restore recovery state after OTA reset.
+          enterRecovery();
+        }
+
+        if (wifi_RecoveryCommitRequested()) {
+          wifi_ApplyConfig();
+          conf_HandleChange();
+          break;
+        }
+      }
+
+      exitRecovery();
+    }
+    led_TickDisable();
+    led_Set(0);
   }
 
-  wifi_CreateFileInRam("index.html", "text/html", (char *)&g_DataIndexHtml[0],
-                       DATA_INDEX_HTML_LENGTH);
+  led_TickConfigure(500, g_SystemTick, &led_TickHandlerBoot);
+  led_TickEnable();
+
+  wifi_CreateFileInRam("index.html", "text/html", "gzip",
+                       (char *)&g_DataIndexHtmlGz[0],
+                       DATA_INDEX_HTML_GZ_LENGTH);
   conf_CreateConfigJson();
 
   printf("Waiting for WIFI UP...\n");
   wifi_WaitState(WIFI_STATE_UP);
 
   // WIFI is up, power off leds.
+  led_TickDisable();
+  led_Set(0x3F << 8);
+  delay(2500);
   led_Set(0);
 
   printf("Entering main loop!\n");
+  button_Reset();
 
   while (1) {
     conf_HandleChange();
-    wifi_HandleChange();
 
-    if (g_buttonPressed) {
+    if (button_IsPressed() || button_PressedDuration() > 0) {
       uint16_t httpStatus;
+      char *url;
 
-      httpStatus = wifi_HttpGet(conf_Get(CONF_URL1));
+      // Show the loading indicator for a long press.
+      led_TickConfigure(500, g_SystemTick, &led_TickHandlerGreenCircleFill);
+      led_TickEnable();
+
+      // Delay until either button is released or we higt the long-press
+      // treshold. 2500 is enough time for all leds to light up, but we add an
+      // extra 50ms to give the last led a little more time to shine.
+      while (button_IsPressed() && button_PressedDuration() < 2550) {
+        ;
+      }
+
+      // If the duration matches a long press, use the long press URL.
+      if (button_PressedDuration() >= 2550) {
+        url = conf_Get(CONF_URL2);
+      } else {
+        url = conf_Get(CONF_URL1);
+      }
+
+      // Speedy loading indicator (rotating light).
+      led_TickConfigure(50, g_SystemTick, &led_TickHandlerGreenLoading);
+      led_TickEnable();
+
+      httpStatus = wifi_HttpGet(url);
+      led_TickDisable();
+
       if (httpStatus >= 400) {
         led_Set(0x0000ff);
       } else if (httpStatus >= 100) {
@@ -98,24 +169,41 @@ int main(void) {
       delay(2000);
       led_Set(0);
 
-      g_buttonPressed = false;
+      button_Reset();
     }
   }
 
   return 0;
 }
 
-void SysTick_Handler(void) {
-  uint32_t bpDuration;
+void enterRecovery(void) {
+  printf("Enter recovery!\n");
 
+  led_TickConfigure(500, g_SystemTick, &led_TickHandlerRecoveryInit);
+  led_TickEnable();
+
+  wifi_EnableRecovery();
+  wifi_EnableFirstConfig("openbttn");
+  wifi_CreateFileInRam("firstset.html", "text/html", "gzip",
+                       (char *)&g_DataFirstsetHtmlGz[0],
+                       DATA_FIRSTSET_HTML_GZ_LENGTH);
+  wifi_WaitState(WIFI_STATE_UP);
+
+  led_TickDisable();
+  led_Set((0x3F << 16)); // Shine blue.
+}
+
+void exitRecovery(void) { wifi_DisableRecovery(); }
+
+void SysTick_Handler(void) {
   g_SystemTick++;
   if (g_SystemDelay) {
     g_SystemDelay--;
   }
 
   wifi_SysTickHandler();
-  bpDuration = button_PressedDuration();
-  led_SysTickHandler(bpDuration);
+  button_SysTickHandler();
+  led_SysTickHandler(g_SystemTick);
 }
 
 void delay(volatile uint32_t ms) {
