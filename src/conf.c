@@ -161,8 +161,8 @@ void conf_HandleChange(void) {
 
   if (config->updated) {
     config->updated = false;
-    delay(200);             // Debounce time.
-    if (!config->updated) { // No update in 200ms.
+    delay(500);             // Debounce time.
+    if (!config->updated) { // No update in 500ms.
       conf_CreateConfigJson();
       printf("Config updated!\n");
     } else {
@@ -171,8 +171,8 @@ void conf_HandleChange(void) {
   }
   if (config->commit) {
     config->commit = false;
-    delay(500);            // Long debounce for commits.
-    if (!config->commit) { // No commit in 500ms.
+    delay(1000);           // Long debounce for commits.
+    if (!config->commit) { // No commit in 1s.
       conf_Commit();
       printf("Config committed!\n");
     }
@@ -181,7 +181,7 @@ void conf_HandleChange(void) {
   // The configuration should not remain unlocked indefinitely, unless a new
   // update is received ,
   if (config->unlocked) {
-    delay(500);
+    delay(1000);
     if (!config->updated) {
       config->unlocked = false;
       printf("Config locked!\n");
