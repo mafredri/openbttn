@@ -117,10 +117,11 @@ enum WifiWind {
 typedef enum WifiCind WifiCind;
 enum WifiCind {
   CIND_AUTHENTICATE = 0,
-  CIND_COMMIT_CONFIG = 1, // Commit configuration changes to EEPROM.
-  CIND_SET_URL1 = 2,      // Set URL1 message.
-  CIND_SET_URL2 = 3,      // Set URL2 message.
-  CIND_UNDEF = 0xFF,      // Undefined message.
+  CIND_COMMIT_CONFIG = 1,   // Commit configuration changes to EEPROM.
+  CIND_SET_URL1 = 2,        // Set URL1 message.
+  CIND_SET_URL2 = 3,        // Set URL2 message.
+  CIND_SEND_AT_COMMAND = 4, // Send AT commands to Wi-Fi module.
+  CIND_UNDEF = 0xFF,        // Undefined message.
 };
 
 typedef enum WifiRecoveryCind WifiRecoveryCind;

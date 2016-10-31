@@ -7,6 +7,7 @@ const cinds = {
 	commit: 1,
 	url1: 2,
 	url2: 3,
+	at_cmd: 4,
 };
 cind.register(cinds);
 

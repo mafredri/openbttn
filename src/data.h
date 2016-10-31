@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-#define DATA_FIRSTSET_HTML_GZ_LENGTH 2169
-#define DATA_INDEX_HTML_GZ_LENGTH 1390
+#define DATA_FIRSTSET_HTML_GZ_LENGTH 2201
+#define DATA_INDEX_HTML_GZ_LENGTH 1486
 
 extern uint8_t g_DataIndexHtmlGz[];
 extern uint8_t g_DataFirstsetHtmlGz[];

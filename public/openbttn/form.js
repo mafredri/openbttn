@@ -41,5 +41,9 @@ function inputToCIND(input) {
 		value = input.value;
 	}
 
+	if (input.type === 'textarea') {
+		value = value.trim().replace('\n', '\r') + '\r';
+	}
+
 	return cind.create(input.id, value);
 }

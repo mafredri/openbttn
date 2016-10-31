@@ -643,17 +643,27 @@ static bool processCind(uint8_t *const buff) {
     url_decode(pText, cindStart, WIFI_CIND_MESSAGE_LENGTH);
     conf_Unlock(pText);
     break;
+
   case CIND_COMMIT_CONFIG:
     conf_RequestCommit();
     break;
+
   case CIND_SET_URL1:
     url_decode(pText, cindStart, WIFI_CIND_MESSAGE_LENGTH);
     conf_Set(CONF_URL1, pText);
     break;
+
   case CIND_SET_URL2:
     url_decode(pText, cindStart, WIFI_CIND_MESSAGE_LENGTH);
     conf_Set(CONF_URL2, pText);
     break;
+
+  case CIND_SEND_AT_COMMAND:
+    url_decode(pText, cindStart, WIFI_CIND_MESSAGE_LENGTH);
+    // TODO: Do not send directly from here (we are in a ISR).
+    wifi_SendString(pText);
+    break;
+
   case CIND_UNDEF:
     return false;
     break;
