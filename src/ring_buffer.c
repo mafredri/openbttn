@@ -3,17 +3,17 @@
 #include "ring_buffer.h"
 
 extern inline bool rb_Empty(RingBuffer *rb);
-extern inline bool rb_Full(RingBuffer *rb);
 extern inline bool rb_HalfFull(RingBuffer *rb);
 
-void rb_Push(RingBuffer *rb, uint8_t data) {
-  rb->buff[(rb->head++) & RING_BUFF_SIZE_MASK] = data;
-
-  if (rb_Full(rb)) {
-    rb->tail++; // Overflow, we just lost some data.
-  } else {
-    rb->count++;
+bool rb_Push(RingBuffer *rb, uint8_t data) {
+  RingBufferSize next = (rb->head + 1) & RING_BUFF_SIZE_MASK;
+  if (next != rb->tail) {
+    rb->buff[rb->head] = data;
+    rb->head = next;
+    return true;
   }
+
+  return false;
 }
 
 uint8_t rb_Pop(RingBuffer *rb) {
@@ -23,10 +23,14 @@ uint8_t rb_Pop(RingBuffer *rb) {
     return '\0';
   }
 
-  data = rb->buff[(rb->tail++) & RING_BUFF_SIZE_MASK];
-  rb->count--;
+  data = rb->buff[rb->tail];
+  rb->tail = (rb->tail + 1) & RING_BUFF_SIZE_MASK;
 
   return data;
 }
 
-void rb_Flush(RingBuffer *rb) { memset(rb, 0, RING_BUFF_SIZE); }
+void rb_Flush(RingBuffer *rb) {
+  memset(rb->buff, 0, RING_BUFF_SIZE);
+  rb->count = 0;
+  rb->tail = rb->head;
+}
