@@ -4,7 +4,7 @@
 #include "syscfg.h"
 
 #define CONF_PASSWORD_LENGTH 64
-#define CONF_URL_LENGTH 120
+#define CONF_URL_LENGTH 200
 
 #define CONF_PRIV_MODE_OPEN 0
 #define CONF_PRIV_MODE_WEP 1
@@ -22,23 +22,13 @@ typedef enum ConfigType {
   CONF_PASSWORD,
 } ConfigType;
 
-typedef struct Config {
-  ConfigData *data;
-  volatile bool unlocked;
-  volatile bool commit;
-  volatile bool updated;
-} Config;
+typedef struct Config { ConfigData *data; } Config;
 
 void conf_Init(void);
-void conf_Commit(void);
+void conf_Save(void);
 void conf_Load(void);
-void conf_Unlock(const char *value);
-bool conf_IsUnlocked(void);
 void *conf_Get(ConfigType type);
-void conf_SetPassword(const char *password);
 void conf_Set(ConfigType type, const void *value);
-void conf_RequestCommit(void);
 void conf_CreateConfigJson(void);
-void conf_HandleChange(void);
 
 #endif /* CONF_H */

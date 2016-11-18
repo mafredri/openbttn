@@ -30,7 +30,7 @@ static void eeprom_write(uint32_t addr, void *data, uint16_t len) {
 static void eeprom_read(uint32_t addr, void *data, uint16_t len) {
   assert(len <= DATA_MAX_LEN);
 
-  uint32_t *src = (uint32_t *)addr;
+  uint32_t *src = (uint32_t *)(long)addr;
   uint32_t *dst = (uint32_t *)data;
   while (len--) {
     *dst++ = *src++;
@@ -44,7 +44,7 @@ void conf_Init(void) {
   conf_Load();
 }
 
-void conf_Commit(void) {
+void conf_Save(void) {
   Config *config = &g_Config;
   eeprom_write(DATA_EEPROM_START_ADDR, config->data,
                sizeof(*config->data) / WORD_SIZE);
@@ -54,22 +54,6 @@ void conf_Load(void) {
   Config *config = &g_Config;
   eeprom_read(DATA_EEPROM_START_ADDR, config->data,
               sizeof(*config->data) / WORD_SIZE);
-}
-
-void conf_Unlock(const char *value) {
-  Config *config = &g_Config;
-
-  if (strncmp(&config->data->password[0], value, CONF_PASSWORD_LENGTH) == 0) {
-    config->unlocked = true;
-    printf("Config unlocked!\n");
-  } else {
-    printf("Config unlock failed, wrong password: %s\n", value);
-  }
-}
-
-bool conf_IsUnlocked(void) {
-  Config *config = &g_Config;
-  return config->unlocked;
 }
 
 void *conf_Get(ConfigType type) {
@@ -90,101 +74,27 @@ void *conf_Get(ConfigType type) {
   return 0;
 }
 
-void conf_SetPassword(const char *password) {
-  Config *config = &g_Config;
-
-  memset(config->data->password, 0, CONF_PASSWORD_LENGTH);
-  strncpy(config->data->password, password, CONF_PASSWORD_LENGTH);
-  config->commit = true;
-}
-
 void conf_Set(ConfigType type, const void *value) {
   Config *config = &g_Config;
-
-  if (!config->unlocked) {
-    printf("Config is locked, cannot set %d: %s\n", type, (char *)value);
-    return;
-  }
 
   switch (type) {
   case CONF_URL1:
     memset(config->data->url1, 0, CONF_URL_LENGTH);
     strncpy(config->data->url1, (char *)value, CONF_URL_LENGTH);
-    config->updated = true;
     break;
 
   case CONF_URL2:
     memset(config->data->url2, 0, CONF_URL_LENGTH);
     strncpy(config->data->url2, (char *)value, CONF_URL_LENGTH);
-    config->updated = true;
     break;
 
-  // Password can only be set through conf_SetPassword.
   case CONF_PASSWORD:
-    printf("Password can not be set from conf_Set!\n");
+    memset(config->data->password, 0, CONF_PASSWORD_LENGTH);
+    strncpy(config->data->password, (char *)value, CONF_PASSWORD_LENGTH);
     break;
 
   default:
     printf("Unhandled config type!\n");
     break;
-  }
-}
-
-void conf_RequestCommit(void) {
-  Config *config = &g_Config;
-
-  if (config->unlocked) {
-    config->commit = true;
-  } else {
-    printf("Config is locked, cannot request commit.\n");
-  }
-}
-
-const char configJson[] = "{\"url1\":\"%s\",\"url2\":\"%s\"}";
-
-void conf_CreateConfigJson(void) {
-  Config *config = &g_Config;
-  char data[strlen(configJson) + CONF_URL_LENGTH + CONF_URL_LENGTH + 1];
-
-  sprintf(&data[0], configJson, config->data->url1, config->data->url2);
-
-  wifi_CreateFileInRam("config.json", "application/json", "identity", &data[0],
-                       strlen(data));
-}
-
-// conf_HandleChange handles changes to the config and must be run periodically
-// to make sure changes are persisted.
-// TODO: Prevent blocking by checking system ticks and using timestamps instead
-// of the current deboucne method.
-void conf_HandleChange(void) {
-  Config *config = &g_Config;
-
-  if (config->updated) {
-    config->updated = false;
-    delay(500);             // Debounce time.
-    if (!config->updated) { // No update in 500ms.
-      conf_CreateConfigJson();
-      printf("Config updated!\n");
-    } else {
-      return; // New update, abort.
-    }
-  }
-  if (config->commit) {
-    config->commit = false;
-    delay(1000);           // Long debounce for commits.
-    if (!config->commit) { // No commit in 1s.
-      conf_Commit();
-      printf("Config committed!\n");
-    }
-  }
-
-  // The configuration should not remain unlocked indefinitely, unless a new
-  // update is received ,
-  if (config->unlocked) {
-    delay(1000);
-    if (!config->updated) {
-      config->unlocked = false;
-      printf("Config locked!\n");
-    }
   }
 }
