@@ -8,7 +8,6 @@
 #include "debug.h"
 #include "led.h"
 #include "syscfg.h"
-#include "util.h"
 #include "wifi.h"
 
 volatile uint32_t g_SystemTick = 0;

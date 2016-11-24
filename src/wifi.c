@@ -1,12 +1,12 @@
-#include <assert.h>
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <libopencm3/cm3/assert.h>
+
 #include "debug.h"
-#include "util.h"
 #include "wifi.h"
 
 uint8_t g_wifiRingBuffSpace[RING_BUFF_SIZE + 1];
@@ -292,7 +292,7 @@ void wifi_CreateFileInRam(const char *name, const char *header,
   uint16_t i;
   uint16_t fileSize = strlen(header) + bodyLength;
 
-  assert(fileSize <= WIFI_FILE_MAX_SIZE);
+  cm3_assert(fileSize <= WIFI_FILE_MAX_SIZE);
 
   snprintf(&fileSizeStr[0], 5 + 1, ",%d", fileSize);
 

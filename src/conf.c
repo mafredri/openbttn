@@ -1,14 +1,10 @@
-#include <assert.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
+#include <libopencm3/cm3/assert.h>
 #include <libopencm3/stm32/flash.h>
 
 #include "conf.h"
-#include "util.h"
-#include "wifi.h"
 
 // We allocate 1024 bytes as configuration space in EEPROM. The maximum size is
 // 4096 (end addess 0x08080FFF).
@@ -22,13 +18,13 @@ static ConfigData g_ConfigData;
 Config g_Config;
 
 static void eeprom_write(uint32_t addr, void *data, uint16_t len) {
-  assert(len <= DATA_MAX_LEN);
+  cm3_assert(len <= DATA_MAX_LEN);
 
   eeprom_program_words(addr, (uint32_t *)data, len);
 }
 
 static void eeprom_read(uint32_t addr, void *data, uint16_t len) {
-  assert(len <= DATA_MAX_LEN);
+  cm3_assert(len <= DATA_MAX_LEN);
 
   uint32_t *src = (uint32_t *)(long)addr;
   uint32_t *dst = (uint32_t *)data;

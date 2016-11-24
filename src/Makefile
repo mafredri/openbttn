@@ -8,6 +8,7 @@ CFLAGS		+= -fno-common -fno-builtin
 CFLAGS		+= -Wall -Wextra -Wshadow
 CFLAGS		+= -Wall -Wextra -Wimplicit-function-declaration -Wredundant-decls -Wstrict-prototypes -Wundef -Wshadow
 CFLAGS		+= -ffunction-sections -fdata-sections
+CFLAGS		+= -DCM3_ASSERT_VERBOSE
 CPPFLAGS	+= -MD
 LDFLAGS		+= -Wl,--gc-sections
 LDFLAGS		+= -static -nostartfiles
