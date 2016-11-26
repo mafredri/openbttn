@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -181,6 +182,31 @@ int main(void) {
         if (strncmp(pch, "dump_config", 12) == 0) {
           dumpConfig = true;
           break;
+        } else if (parseParamValue(&value, pch, "blink_leds")) {
+          char *pNum;
+          uint32_t num;
+          bool isDelay = false;
+          bool hasNext = true;
+
+          while (hasNext) {
+            pNum = value;
+
+            while (isxdigit(*value++))
+              ;
+            if (pNum == value) {
+              break;
+            }
+
+            num = (uint32_t)strtoul(pNum, NULL, 16);
+            if (isDelay) {
+              delay(num);
+            } else {
+              led_Set(num);
+            }
+
+            isDelay = !isDelay;
+            hasNext = (*(value - 1) == ';');
+          }
         } else if (parseParamValue(&value, pch, "url1")) {
           conf_Set(CONF_URL1, value);
         } else if (parseParamValue(&value, pch, "url2")) {
