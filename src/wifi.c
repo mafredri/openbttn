@@ -25,6 +25,7 @@ static void gpioSetup(void);
 static void usartSetup(void);
 static void resetWifiData(WifiData *wifi);
 static void atReset(WifiAt *at);
+static void atCmdPrepare(void);
 void enterCommandMode(void);
 void enterDataMode(void);
 static inline void safeAppendBuffer(WifiBuff *b, uint8_t data);
@@ -58,6 +59,8 @@ void wifi_SoftReset(void) {
 
   // We must wait for the console to be active.
   wifi_WaitState(WIFI_STATE_CONSOLE_ACTIVE);
+
+  atCmdPrepare();
 
   wifi_SendString("AT+CFUN=1");
   wifi->state &= ~(WIFI_STATE_POWER_ON);
@@ -178,20 +181,8 @@ static void atReset(WifiAt *at) {
   at->pos = 0;
 }
 
-// wifi_AtCmdWait waits until we recieve the entire AT response and returns true
-// if there was no error, otherwise false.
-bool wifi_AtCmdWait(void) {
-  WifiData *wifi = &g_wifiData;
-
-  while (!(wifi->at->status & AT_STATUS_READY))
-    ;
-
-  return (wifi->at->status & AT_STATUS_ERROR) == 0;
-}
-
-void wifi_AtCmdN(int n, ...) {
-  va_list args;
-  int i;
+// atCmdPrepare ensures that it is safe to issue an AT command.
+static void atCmdPrepare(void) {
   WifiData *wifi = &g_wifiData;
 
   wifi_WaitState(WIFI_STATE_CONSOLE_ACTIVE);
@@ -217,6 +208,27 @@ void wifi_AtCmdN(int n, ...) {
   // command.
   wifi_StopSockd();
 #endif
+}
+
+// wifi_AtCmdWait waits until we recieve the entire AT response and returns true
+// if there was no error, otherwise false.
+bool wifi_AtCmdWait(void) {
+  WifiData *wifi = &g_wifiData;
+
+  while (!(wifi->at->status & AT_STATUS_READY))
+    ;
+
+  return (wifi->at->status & AT_STATUS_ERROR) == 0;
+}
+
+// wifi_AtCmdN takes multiple arguments (char *) and issues them as one whole AT
+// command to the WiFi module.
+void wifi_AtCmdN(int n, ...) {
+  va_list args;
+  int i;
+  WifiData *wifi = &g_wifiData;
+
+  atCmdPrepare();
 
   // Reset AT after function calls.
   atReset(wifi->at);
