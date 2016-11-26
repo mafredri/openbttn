@@ -1,12 +1,14 @@
-# Open bttn firmware
+# OpenBttn
 
-This is custom firmware for bt.tns that avoids communicating with the official bt.tn server. It's written using the [libopencm3](https://github.com/libopencm3/libopencm3) firmware library for ARM Cortex-M3 microcontrollers.
+OpenBttn is a custom open source firmware for [bt.tn](https://bt.tn) buttons. This firmware does not communicate with the official bt.tn servers and contains some features not available in the original firmware. It's written using the [libopencm3](https://github.com/libopencm3/libopencm3) firmware library for ARM Cortex-M3 microcontrollers.
 
 This firmware is in no way associated with The Button Corporation Ltd.
 
 Installing this firmware will most likely void your warranty.
 
 ## Gettings started
+
+### Building
 
 Install the [GNU ARM Embedded Toolchain](https://launchpad.net/gcc-arm-embedded/+download):
 
@@ -24,27 +26,42 @@ make  # builds src/
 
 Upload `main.elf` to your bttn using OpenOCD.
 
+### Installing the firmware
+
+This firmware can be installed in two ways, either via DFU mode or via the JTAG interface on the bt.tn board. Below are instructions for starting the bt.tn in DFU mode and downloading the firmware onto it:
+
+1. Open the bt.tn, there are three torx screws at the bottom
+2. Connect the [boot pins](./resources/bttn-boot-pins.png) on the board
+3. Connect via USB to computer
+    * It should now show up in the DFU list (`dfu-util --list`)
+4. `cd openbttn/src && make download`
+
+`make download` is the same as manually issuing `dfu-util -d 0483:df11 -s 0x08000000 -a 0 -D main.bin` which requires the `main.bin` to be built first. This downloads the firmare to the bt.tn and overwrites the original firmware.
+
+## Features
+
+* Allow spaces in Wi-Fi SSIDs (the original firmware doesn't).
+    * Probably other special characters as well.
+* Single and long press
+* Live configuration (from Web-UI hosted on bt.tn)
+* OTA update of the SPWF01SA Wi-Fi module
+* Custom led flashing by POST request
+    * This is a WIP and part of the `socket-refactor` branch (d2a22cb)
+* Password authentication for bt.tn configuration
 
 ## Current status
 
-### What works
+### TODO
 
-* Board power
-* Leds
-* Debugging USART (e.g. for `printf` output)
-* WIFI USART
-* Pressing the button sends a HTTP GET request
-    * Show led light for 2 seconds depending on HTTP Status Code
-
-### Todo
-
-* ~~Read / parse http responses from the WIFI module~~
-* Write led flashing presets
-* Short / long (/ extra long) press of button
-* Secure the internal SPWF01SA HTTP server
+* Complete the `socket-refactor` branch
+* Improve Web-UI
 
 ### Nice to have
 
-* OTA updates
-* Double press of button
-* Live configuration through WebUI
+* OTA update of OpenBttn (we are already able to OTA update the Wi-Fi module, updating OpenBttn remotely would also be nice)
+* More ways to interact with the bt.tn (double press, ulta-long press, etc?)
+
+### Limitations
+
+* We cannot use hardware flow control for the SPWF01SA Wi-Fi module because the CTS/RTS ports of the Wi-Fi module are incorrectly set up in the bt.tn hardware. The CTS/RTS is set up as output/input whereas is should be the other way around, input/output. This makes it impossible for the bt.tn (RTS) to send signals to the Wi-Fi module (CTS) and vice-versa.
+    * Using hardware flow control would allow us to use a smaller ring buffer and ask the WiFi module to take breaks in sending it's data, thus relying on it's, much larger, RAM.
