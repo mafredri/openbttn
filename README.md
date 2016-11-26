@@ -31,7 +31,7 @@ Upload `main.elf` to your bttn using OpenOCD.
 This firmware can be installed in two ways, either via DFU mode or via the JTAG interface on the bt.tn board. Below are instructions for starting the bt.tn in DFU mode and downloading the firmware onto it:
 
 1. Open the bt.tn, there are three torx screws at the bottom
-2. Connect the [boot pins](./resources/bttn-boot-pins.png) on the board
+2. Connect the [Boot pins](./resources/bttn-boot-pins.png) on the board (note: only the Boot pins, not the FWSel ones)
 3. Connect via USB to computer
     * It should now show up in the DFU list (`dfu-util --list`)
 4. `cd openbttn/src && make download`
