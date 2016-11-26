@@ -187,8 +187,6 @@ int main(void) {
           conf_Set(CONF_URL2, value);
         } else if (parseParamValue(&value, pch, "password")) {
           conf_Set(CONF_PASSWORD, value);
-          strncpy(wifiConfig.userDesc, (char *)conf_Get(CONF_PASSWORD),
-                  sizeof(wifiConfig.userDesc));
         } else if (parseParamValue(&value, pch, "save")) {
           if (*value == '1') {
             saveConfig = true;
@@ -203,7 +201,7 @@ int main(void) {
         } else if (parseParamValue(&value, pch, "wifi_mode")) {
           wifiConfig.wifiMode = (uint8_t)atoi(value);
         } else if (parseParamValue(&value, pch, "dhcp")) {
-          wifiConfig.wifiMode = (uint8_t)atoi(value);
+          wifiConfig.dhcp = (uint8_t)atoi(value);
         } else if (parseParamValue(&value, pch, "ip_addr")) {
           strncpy(wifiConfig.ipAddr, value, sizeof(wifiConfig.ipAddr));
         } else if (parseParamValue(&value, pch, "ip_netmask")) {
@@ -212,22 +210,12 @@ int main(void) {
           strncpy(wifiConfig.ipGateway, value, sizeof(wifiConfig.ipGateway));
         } else if (parseParamValue(&value, pch, "ip_dns")) {
           strncpy(wifiConfig.ipDns, value, sizeof(wifiConfig.ipDns));
-        } else if (parseParamValue(&value, pch, "wifi_mode")) {
-          wifiConfig.wifiMode = (uint8_t)atoi(value);
         } else if (parseParamValue(&value, pch, "ota")) {
           strncpy(wifiConfig.otaUrl, value, sizeof(wifiConfig.otaUrl));
           otaUpdate = true;
         }
 
         pch = strtok(NULL, "\r\n");
-      }
-
-      if (saveConfig) {
-        conf_Save();
-      }
-
-      if (saveWifiConfig) {
-        wifi_ApplyConfig(&wifiConfig);
       }
 
       if (dumpConfig) {
@@ -258,6 +246,17 @@ int main(void) {
       }
 
       wifi_SockdClearData();
+
+      if (saveConfig) {
+        conf_Save();
+      }
+
+      if (saveWifiConfig) {
+        strncpy(wifiConfig.userDesc, conf_Get(CONF_PASSWORD),
+                sizeof(wifiConfig.userDesc));
+        wifi_ApplyConfig(&wifiConfig);
+        wifi_SoftReset();
+      }
     }
 
     if (button_IsPressed() || button_PressedDuration() > 0) {
