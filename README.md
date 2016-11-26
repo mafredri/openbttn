@@ -36,7 +36,7 @@ This firmware can be installed in two ways, either via DFU mode or via the JTAG 
     * It should now show up in the DFU list (`dfu-util --list`)
 4. `cd openbttn/src && make download`
 
-`make download` is the same as manually issuing `dfu-util -d 0483:df11 -s 0x08000000 -a 0 -D main.bin` which requires the `main.bin` to be built first. This downloads the firmare to the bt.tn and overwrites the original firmware.
+`make download` is the same as manually issuing `dfu-util -d 0483:df11 -s 0x08000000 -a 0 -D main.bin` which requires the `main.bin` to be built first. This downloads the firmware to the bt.tn and overwrites the original firmware.
 
 ## Features
 
