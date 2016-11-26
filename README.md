@@ -26,6 +26,13 @@ make  # builds src/
 
 Upload `main.elf` to your bttn using OpenOCD.
 
+### Backup original firmware
+
+1. Start in DFU mode (see below)
+2. Run: `dfu-util --device 0483:df11 --dfuse-address 0x08000000 --alt 0 --upload backup.bin`
+
+This will upload the firmware from the bt.tn to your computer and save it as `backup.bin`. Only use this backup to restore your bt.tn to its original state.
+
 ### Installing the firmware
 
 This firmware can be installed in two ways, either via DFU mode or via the JTAG interface on the bt.tn board. Below are instructions for starting the bt.tn in DFU mode and downloading the firmware onto it:
