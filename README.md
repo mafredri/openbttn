@@ -50,6 +50,7 @@ This firmware can be installed in two ways, either via DFU mode or via the JTAG 
 * Allow spaces in Wi-Fi SSIDs (the original firmware doesn't).
     * Probably other special characters as well.
 * Single and long press
+    * Super fast response times in a local setting
 * Live configuration (from Web-UI hosted on bt.tn)
 * OTA update of the SPWF01SA Wi-Fi module
 * Custom led flashing by POST request
@@ -72,3 +73,12 @@ This firmware can be installed in two ways, either via DFU mode or via the JTAG 
 
 * We cannot use hardware flow control for the SPWF01SA Wi-Fi module because the CTS/RTS ports of the Wi-Fi module are incorrectly set up in the bt.tn hardware. The CTS/RTS is set up as output/input whereas is should be the other way around, input/output. This makes it impossible for the bt.tn (RTS) to send signals to the Wi-Fi module (CTS) and vice-versa.
     * Using hardware flow control would allow us to use a smaller ring buffer and ask the WiFi module to take breaks in sending it's data, thus relying on it's, much larger, RAM.
+
+## Motivation
+
+* I happened to have a bricked (after OTA update) bt.tn around to play with and wanted some experience with embedded programming
+* Local requests in original firmware were too slow
+    * A token request to the bt.tn servers were issued before the local request was performed
+* Investigate Wi-Fi issues in bt.tn
+    * Turns out it's an issue with the SPWF01SA Wi-Fi module
+    * Can be worked around by running the WiFi module in power save mode or by connecting to a different WiFi AP
