@@ -93,9 +93,8 @@ void wifi_WaitState(WifiState states) {
   while (wifi->processing)
     ;
 
-  while ((wifi->state & states) == 0) {
+  while (!(wifi->state & states))
     ;
-  }
 }
 
 void wifi_SendString(const char *str) {

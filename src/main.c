@@ -64,9 +64,8 @@ int main(void) {
     led_TickEnable();
 
     // Wait until button is released or 4000ms has passed.
-    while (button_IsPressed() && button_PressedDuration() < 4000) {
+    while (button_IsPressed() && button_PressedDuration() < 4000)
       ;
-    }
 
     led_TickDisable();
 
@@ -145,7 +144,7 @@ int main(void) {
 
   printf("Entering main loop!\n");
 
-  while (1) {
+  while (true) {
     char *socketData = NULL;
 
     // Handle state changes of the WiFi module.
@@ -296,9 +295,8 @@ int main(void) {
       // Delay until either button is released or we higt the long-press
       // treshold. 2500 is enough time for all leds to light up, but we add an
       // extra 50ms to give the last led a little more time to shine.
-      while (button_IsPressed() && button_PressedDuration() < 2550) {
+      while (button_IsPressed() && button_PressedDuration() < 2550)
         ;
-      }
 
       // If the duration matches a long press, use the long press URL.
       if (button_PressedDuration() >= 2550) {
