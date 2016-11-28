@@ -78,14 +78,6 @@ void wifi_HardReset(void) {
   wifi_WaitState(WIFI_STATE_POWER_ON);
 }
 
-void wifi_HandleState(void) {
-  WifiData *wifi = &g_wifiData;
-
-  if (wifi->state & WIFI_STATE_SOCKD_PENDING_DATA) {
-    enterDataMode();
-  }
-}
-
 // wifi_WaitState waits until the WIFI module is in specified state.
 void wifi_WaitState(WifiState states) {
   WifiData *wifi = &g_wifiData;
@@ -448,6 +440,15 @@ bool wifi_OtaUpdate(char *url) {
 bool wifi_SockdStarted(void) {
   WifiData *wifi = &g_wifiData;
   return (wifi->state & WIFI_STATE_SOCKD_STARTED) != 0;
+}
+
+// wifi_SockdHandler handles state changes for the socket server.
+void wifi_SockdHandler(void) {
+  WifiData *wifi = &g_wifiData;
+
+  if (wifi->state & WIFI_STATE_SOCKD_PENDING_DATA) {
+    enterDataMode();
+  }
 }
 
 // wifi_StartSockd starts the socket server, returning true if the server was

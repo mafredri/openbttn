@@ -16,20 +16,11 @@ volatile uint32_t g_SystemDelay = 0;
 
 static char g_httpHeader[HTTP_HEADER_LENGTH] = {0};
 
+void processSocketData(char *data);
 void enterRecovery(void);
 void exitRecovery(void);
 static void clockSetup(void);
 static void gpioSetup(void);
-
-bool parseParamValue(char **dest, char *const src, char *param) {
-  uint8_t len = strlen(param);
-  if (strncasecmp(src, param, len) == 0 && strncmp(src + len, " = ", 3) == 0) {
-    *dest = src + len + 3;
-    return true;
-  }
-
-  return false;
-}
 
 int main(void) {
   clockSetup();
@@ -117,11 +108,6 @@ int main(void) {
     led_Set(0);
   }
 
-  // wifi_AtCmdBlocking("AT+S.SCFG=console1_hwfc,0");
-  // wifi_AtCmdBlocking("AT&W");
-  // wifi_SoftReset();
-  // gpio_clear(WIFI_GPIO_PORT, WIFI_GPIO_CTS);
-
   led_TickConfigure(500, g_SystemTick, &led_TickHandlerBoot);
   led_TickEnable();
 
@@ -147,141 +133,17 @@ int main(void) {
   while (true) {
     char *socketData = NULL;
 
-    // Handle state changes of the WiFi module.
-    wifi_HandleState();
-
+    // Make sure the socket server is running.
     if (!wifi_SockdStarted()) {
       wifi_StartSockd(8774);
     }
+    // Handle state changes for the socket server.
+    wifi_SockdHandler();
 
     socketData = (char *)wifi_SockdGetData();
     if (socketData) {
-      WifiConfig wifiConfig;
-      bool dumpConfig = false;
-      bool authenticated = false;
-      bool saveConfig = false;
-      bool otaUpdate = false;
-      bool saveWifiConfig = false;
-      char *pch = NULL;
-      char *value = NULL;
-
-      printf("Socket data: %s\n", socketData);
-
-      pch = strtok(socketData, "\r\n");
-      if (parseParamValue(&value, pch, "auth")) {
-        if (strncmp((char *)conf_Get(CONF_PASSWORD), value,
-                    CONF_PASSWORD_LENGTH) == 0) {
-          authenticated = true;
-        }
-      }
-
-      while (authenticated && pch != NULL) {
-        value = NULL;
-
-        if (strncmp(pch, "dump_config", 12) == 0) {
-          dumpConfig = true;
-          break;
-        } else if (parseParamValue(&value, pch, "blink_leds")) {
-          char *pNum;
-          uint32_t num;
-          bool isDelay = false;
-          bool hasNext = true;
-
-          while (hasNext) {
-            pNum = value;
-
-            while (isxdigit(*value++))
-              ;
-            if (pNum == value) {
-              break;
-            }
-
-            num = (uint32_t)strtoul(pNum, NULL, 16);
-            if (isDelay) {
-              delay(num);
-            } else {
-              led_Set(num);
-            }
-
-            isDelay = !isDelay;
-            hasNext = (*(value - 1) == ';');
-          }
-        } else if (parseParamValue(&value, pch, "url1")) {
-          conf_Set(CONF_URL1, value);
-        } else if (parseParamValue(&value, pch, "url2")) {
-          conf_Set(CONF_URL2, value);
-        } else if (parseParamValue(&value, pch, "password")) {
-          conf_Set(CONF_PASSWORD, value);
-        } else if (parseParamValue(&value, pch, "save")) {
-          if (*value == '1') {
-            saveConfig = true;
-          }
-        } else if (parseParamValue(&value, pch, "ssid")) {
-          strncpy(wifiConfig.ssid, value, sizeof(wifiConfig.ssid));
-          saveWifiConfig = true;
-        } else if (parseParamValue(&value, pch, "wpa_psk")) {
-          strncpy(wifiConfig.wpaPsk, value, sizeof(wifiConfig.wpaPsk));
-        } else if (parseParamValue(&value, pch, "priv_mode")) {
-          wifiConfig.privMode = (uint8_t)atoi(value);
-        } else if (parseParamValue(&value, pch, "wifi_mode")) {
-          wifiConfig.wifiMode = (uint8_t)atoi(value);
-        } else if (parseParamValue(&value, pch, "dhcp")) {
-          wifiConfig.dhcp = (uint8_t)atoi(value);
-        } else if (parseParamValue(&value, pch, "ip_addr")) {
-          strncpy(wifiConfig.ipAddr, value, sizeof(wifiConfig.ipAddr));
-        } else if (parseParamValue(&value, pch, "ip_netmask")) {
-          strncpy(wifiConfig.ipNetmask, value, sizeof(wifiConfig.ipNetmask));
-        } else if (parseParamValue(&value, pch, "ip_gateway")) {
-          strncpy(wifiConfig.ipGateway, value, sizeof(wifiConfig.ipGateway));
-        } else if (parseParamValue(&value, pch, "ip_dns")) {
-          strncpy(wifiConfig.ipDns, value, sizeof(wifiConfig.ipDns));
-        } else if (parseParamValue(&value, pch, "ota")) {
-          strncpy(wifiConfig.otaUrl, value, sizeof(wifiConfig.otaUrl));
-          otaUpdate = true;
-        }
-
-        pch = strtok(NULL, "\r\n");
-      }
-
-      if (dumpConfig) {
-        char *url1 = conf_Get(CONF_URL1);
-        char *url2 = conf_Get(CONF_URL2);
-        uint16_t len =
-            21 + strlen(url1) + strlen(url2); // {"url1":"","url2":""}
-        wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
-                              "text/plain", NULL, len);
-
-        wifi_SockdSendN(6, g_httpHeader, "{\"url1\":\"", url1, "\",\"url2\":\"",
-                        url2, "\"}");
-      } else if (authenticated) {
-        wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
-                              "text/plain", NULL, 7);
-
-        wifi_SockdSendN(2, g_httpHeader, "success");
-      } else if (!authenticated) {
-        wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 403,
-                              "Forbidden", "text/plain", NULL, 21);
-
-        wifi_SockdSendN(2, g_httpHeader, "authentication failed");
-      } else {
-        wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 400,
-                              "Bad Request", "text/plain", NULL, 5);
-
-        wifi_SockdSendN(2, g_httpHeader, "error");
-      }
-
+      processSocketData(socketData);
       wifi_SockdClearData();
-
-      if (saveConfig) {
-        conf_Save();
-      }
-
-      if (saveWifiConfig) {
-        strncpy(wifiConfig.userDesc, conf_Get(CONF_PASSWORD),
-                sizeof(wifiConfig.userDesc));
-        wifi_ApplyConfig(&wifiConfig);
-        wifi_SoftReset();
-      }
     }
 
     if (button_IsPressed() || button_PressedDuration() > 0) {
@@ -330,6 +192,150 @@ int main(void) {
   }
 
   return 0;
+}
+
+// parseParamValue parses a string of type "param = value", returns true if the
+// requested param was found and sets the value to dest.
+bool parseParamValue(char **dest, char *const src, char *param) {
+  uint8_t len = strlen(param);
+  if (strncasecmp(src, param, len) == 0 && strncmp(src + len, " = ", 3) == 0) {
+    *dest = src + len + 3;
+    return true;
+  }
+
+  return false;
+}
+
+// processSocketData takes the data from a POST request to the socket and parses
+// it for authentication and commands / configuration. Returns a HTTP response
+// on the socket.
+void processSocketData(char *data) {
+  WifiConfig wifiConfig;
+  bool dumpConfig = false;
+  bool authenticated = false;
+  bool saveConfig = false;
+  bool otaUpdate = false;
+  bool saveWifiConfig = false;
+  char *pch = NULL;
+  char *value = NULL;
+
+  // Tokenise the data on newlines, each new line represents a new parameter /
+  // value.
+  pch = strtok(data, "\r\n");
+
+  // First parameter must be authentication.
+  if (parseParamValue(&value, pch, "auth")) {
+    if (strncmp((char *)conf_Get(CONF_PASSWORD), value, CONF_PASSWORD_LENGTH) ==
+        0) {
+      authenticated = true;
+    }
+  }
+  pch = strtok(NULL, "\r\n"); // Next token (after auth).
+
+  while (authenticated && pch != NULL) {
+    value = NULL;
+
+    if (strncmp(pch, "dump_config", 12) == 0) {
+      dumpConfig = true;
+      break;
+    } else if (parseParamValue(&value, pch, "blink_leds")) {
+      char *pNum;
+      uint32_t num;
+      bool isDelay = false;
+      bool hasNext = true;
+
+      while (hasNext) {
+        pNum = value;
+
+        while (isxdigit(*value++))
+          ;
+        if (pNum == value) {
+          break;
+        }
+
+        num = (uint32_t)strtoul(pNum, NULL, 16);
+        if (isDelay) {
+          delay(num);
+        } else {
+          led_Set(num);
+        }
+
+        isDelay = !isDelay;
+        hasNext = (*(value - 1) == ';');
+      }
+    } else if (parseParamValue(&value, pch, "url1")) {
+      conf_Set(CONF_URL1, value);
+    } else if (parseParamValue(&value, pch, "url2")) {
+      conf_Set(CONF_URL2, value);
+    } else if (parseParamValue(&value, pch, "password")) {
+      conf_Set(CONF_PASSWORD, value);
+    } else if (parseParamValue(&value, pch, "save")) {
+      if (*value == '1') {
+        saveConfig = true;
+      }
+    } else if (parseParamValue(&value, pch, "ssid")) {
+      strncpy(wifiConfig.ssid, value, sizeof(wifiConfig.ssid));
+      saveWifiConfig = true;
+    } else if (parseParamValue(&value, pch, "wpa_psk")) {
+      strncpy(wifiConfig.wpaPsk, value, sizeof(wifiConfig.wpaPsk));
+    } else if (parseParamValue(&value, pch, "priv_mode")) {
+      wifiConfig.privMode = (uint8_t)atoi(value);
+    } else if (parseParamValue(&value, pch, "wifi_mode")) {
+      wifiConfig.wifiMode = (uint8_t)atoi(value);
+    } else if (parseParamValue(&value, pch, "dhcp")) {
+      wifiConfig.dhcp = (uint8_t)atoi(value);
+    } else if (parseParamValue(&value, pch, "ip_addr")) {
+      strncpy(wifiConfig.ipAddr, value, sizeof(wifiConfig.ipAddr));
+    } else if (parseParamValue(&value, pch, "ip_netmask")) {
+      strncpy(wifiConfig.ipNetmask, value, sizeof(wifiConfig.ipNetmask));
+    } else if (parseParamValue(&value, pch, "ip_gateway")) {
+      strncpy(wifiConfig.ipGateway, value, sizeof(wifiConfig.ipGateway));
+    } else if (parseParamValue(&value, pch, "ip_dns")) {
+      strncpy(wifiConfig.ipDns, value, sizeof(wifiConfig.ipDns));
+    } else if (parseParamValue(&value, pch, "ota")) {
+      strncpy(wifiConfig.otaUrl, value, sizeof(wifiConfig.otaUrl));
+      otaUpdate = true;
+    }
+
+    pch = strtok(NULL, "\r\n");
+  }
+
+  if (dumpConfig) {
+    char *url1 = conf_Get(CONF_URL1);
+    char *url2 = conf_Get(CONF_URL2);
+    uint16_t len = 21 + strlen(url1) + strlen(url2); // {"url1":"","url2":""}
+    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
+                          "text/plain", NULL, len);
+
+    wifi_SockdSendN(6, g_httpHeader, "{\"url1\":\"", url1, "\",\"url2\":\"",
+                    url2, "\"}");
+  } else if (authenticated) {
+    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
+                          "text/plain", NULL, 7);
+
+    wifi_SockdSendN(2, g_httpHeader, "success");
+  } else if (!authenticated) {
+    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 403, "Forbidden",
+                          "text/plain", NULL, 21);
+
+    wifi_SockdSendN(2, g_httpHeader, "authentication failed");
+  } else {
+    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 400, "Bad Request",
+                          "text/plain", NULL, 5);
+
+    wifi_SockdSendN(2, g_httpHeader, "error");
+  }
+
+  if (saveConfig) {
+    conf_Save();
+  }
+
+  if (saveWifiConfig) {
+    strncpy(wifiConfig.userDesc, conf_Get(CONF_PASSWORD),
+            sizeof(wifiConfig.userDesc));
+    wifi_ApplyConfig(&wifiConfig);
+    wifi_SoftReset();
+  }
 }
 
 void enterRecovery(void) {

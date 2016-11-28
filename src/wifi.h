@@ -162,7 +162,6 @@ void wifi_PowerOn(void);
 void wifi_PowerOff(void);
 void wifi_SoftReset(void);
 void wifi_HardReset(void);
-void wifi_HandleState(void);
 void wifi_WaitState(WifiState states);
 void wifi_AtCmdN(int n, ...);
 void wifi_AtCmd(char *str);
@@ -180,6 +179,7 @@ void wifi_CreateFileInRam(const char *name, const char *header,
 void wifi_ApplyConfig(WifiConfig *config);
 bool wifi_OtaUpdate(char *url);
 bool wifi_SockdStarted(void);
+void wifi_SockdHandler(void);
 bool wifi_StartSockd(uint16_t port);
 bool wifi_StopSockd(void);
 uint8_t *wifi_SockdGetData(void);
