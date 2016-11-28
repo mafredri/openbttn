@@ -50,6 +50,33 @@ func testHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hi there, I love %s!\n - OpenBttn", r.URL.Path[6:])
 }
 
+// bttnSocketRedirectHandler redirects requests to the bttn Socket server.
+func bttnSocketRedirectHandler(bttnIP string) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("HTTP %s - %s", r.Method, r.URL.Path)
+
+		url := fmt.Sprintf("http://%s:8774%s", bttnIP, r.URL.RequestURI())
+		req, err := http.NewRequest(r.Method, url, r.Body)
+
+		req.ContentLength = r.ContentLength
+		req.Header.Set("Content-Type", r.Header.Get("Content-Type"))
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			panic(err)
+		}
+		defer resp.Body.Close()
+
+		b, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			panic(err)
+		}
+
+		w.WriteHeader(resp.StatusCode)
+		w.Write(b)
+	}
+}
+
 // bttnRedirectHandler requests a file from the bttn HTTP server and returns it
 // as if it was a local resource to this server. This is useful for testing the
 // HTML files that are to be served from the bttn.
@@ -144,6 +171,7 @@ func main() {
 	flag.Parse()
 
 	http.HandleFunc("/", notFoundHandler)
+	http.HandleFunc("/socket", bttnSocketRedirectHandler(bttnIP))
 	http.HandleFunc("/test/", testHandler)
 	http.Handle("/public/", http.StripPrefix("/public/", http.FileServer(http.Dir(publicPath))))
 
