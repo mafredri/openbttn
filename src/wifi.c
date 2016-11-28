@@ -328,7 +328,7 @@ void wifi_EnableFirstConfig(const char *ssid) {
   wifi_AtCmdBlocking("AT+S.SCFG=wifi_mode,3");      // MiniAP mode.
   wifi_AtCmdBlocking("AT+S.SCFG=ip_use_decoder,0"); // Use RAW for output.
   wifi_AtCmdBlocking("AT+S.SCFG=ip_use_cgis,0");    // Disable all CGIs.
-  wifi_AtCmdBlocking("AT+S.SCFG=ip_use_ssis,0");    // Disable all SSIs.
+  wifi_AtCmdBlocking("AT+S.SCFG=ip_use_ssis,F");    // Enable all SSIs.
   wifi_AtCmdBlocking("AT+S.SCFG=wifi_priv_mode,0");
 
   wifi_AtCmdBlocking("AT+S.SCFG=ip_use_dhcp,2"); // Customise IP.
@@ -343,14 +343,18 @@ void wifi_EnableFirstConfig(const char *ssid) {
 
 // wifi_ApplyConfig applies a wifi configuration to the WiFi module, reboot must
 // be performed for all changes to take effect.
-// TODO: Handle Open and WEP priv_mode.
 void wifi_ApplyConfig(WifiConfig *config) {
+  // Require the "WPA & WPA2" privacy mode, "Open" and "WEP" are also valid
+  // modes, but currently unsupported.
+  cm3_assert(config->privMode == 2);
+  cm3_assert(config->wifiMode == 0 || config->wifiMode == 1);
+
   wifi_AtCmdBlocking("AT&F"); // Factory reset.
 
   wifi_AtCmdBlocking("AT+S.SCFG=console1_hwfc,0");
   wifi_AtCmdBlocking("AT+S.SCFG=wifi_mode,1");   // Station mode.
   wifi_AtCmdBlocking("AT+S.SCFG=ip_use_cgis,0"); // Disable all CGIs.
-  wifi_AtCmdBlocking("AT+S.SCFG=ip_use_ssis,0"); // Disable all SSIs.
+  wifi_AtCmdBlocking("AT+S.SCFG=ip_use_ssis,F"); // Enable all SSIs.
   wifi_AtCmdBlocking("AT+S.SCFG=ip_use_decoder,0");
 
   // Set the SSID we should to connect to.
@@ -362,10 +366,6 @@ void wifi_ApplyConfig(WifiConfig *config) {
     wifi_AtCmdBlocking("AT+S.SCFG=wifi_priv_mode,2");
     wifi_AtCmdN(2, "AT+S.SCFG=wifi_wpa_psk_text,", config->wpaPsk);
     wifi_AtCmdWait();
-  } else {
-    // TODO: Maybe implement WEP.
-    // (PS. I don't really want to because nobody should be using WEP anymore!)
-    printf("Open and WEP wifi modes not implemented!\n");
   }
 
   if (config->wifiMode == 1) {
@@ -402,7 +402,6 @@ void wifi_ApplyConfig(WifiConfig *config) {
   }
 
   wifi_AtCmdBlocking("AT&W"); // Write settings.
-  // wifi_SoftReset();
 }
 
 // wifi_OtaUpdate performs a firmware OTA update for the WiFi module.
