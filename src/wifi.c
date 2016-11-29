@@ -342,6 +342,10 @@ void wifi_EnableFirstConfig(const char *ssid) {
   wifi_AtCmdBlocking("AT+S.SCFG=ip_gw,192.168.1.1");
   wifi_AtCmdBlocking("AT+S.SCFG=ip_dns,192.168.1.1");
 
+  // Increase HTTP GET connection timeout (default 1000 ms). This increases the
+  // likelyhood of a successfull OTA update.
+  wifi_AtCmdBlocking("AT+S.SCFG=ip_http_get_recv_timeout,10000");
+
   wifi_AtCmdBlocking("AT&W");
   wifi_SoftReset();
 }
