@@ -216,6 +216,7 @@ void processSocketData(char *data) {
   bool saveConfig = false;
   bool otaUpdate = false;
   bool saveWifiConfig = false;
+  bool error = false;
   char *pch = NULL;
   char *value = NULL;
 
@@ -228,6 +229,7 @@ void processSocketData(char *data) {
     if (strncmp((char *)conf_Get(CONF_PASSWORD), value, CONF_PASSWORD_LENGTH) ==
         0) {
       authenticated = true;
+      wifi_SockdIsSafeClient();
     }
   }
   pch = strtok(NULL, "\r\n"); // Next token (after auth).
@@ -295,35 +297,12 @@ void processSocketData(char *data) {
     } else if (parseParamValue(&value, pch, "ota")) {
       strncpy(wifiConfig.otaUrl, value, sizeof(wifiConfig.otaUrl));
       otaUpdate = true;
+    } else {
+      error = true;
+      break;
     }
 
     pch = strtok(NULL, "\r\n");
-  }
-
-  if (dumpConfig) {
-    char *url1 = conf_Get(CONF_URL1);
-    char *url2 = conf_Get(CONF_URL2);
-    uint16_t len = 21 + strlen(url1) + strlen(url2); // {"url1":"","url2":""}
-    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
-                          "text/plain", NULL, len);
-
-    wifi_SockdSendN(6, g_httpHeader, "{\"url1\":\"", url1, "\",\"url2\":\"",
-                    url2, "\"}");
-  } else if (authenticated) {
-    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
-                          "text/plain", NULL, 7);
-
-    wifi_SockdSendN(2, g_httpHeader, "success");
-  } else if (!authenticated) {
-    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 403, "Forbidden",
-                          "text/plain", NULL, 21);
-
-    wifi_SockdSendN(2, g_httpHeader, "authentication failed");
-  } else {
-    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 400, "Bad Request",
-                          "text/plain", NULL, 5);
-
-    wifi_SockdSendN(2, g_httpHeader, "error");
   }
 
   if (saveConfig) {
@@ -334,6 +313,31 @@ void processSocketData(char *data) {
     strncpy(wifiConfig.userDesc, conf_Get(CONF_PASSWORD),
             sizeof(wifiConfig.userDesc));
     wifi_ApplyConfig(&wifiConfig);
+  }
+
+  if (authenticated && dumpConfig) {
+    char *url1 = conf_Get(CONF_URL1);
+    char *url2 = conf_Get(CONF_URL2);
+    uint16_t len = 21 + strlen(url1) + strlen(url2); // {"url1":"","url2":""}
+    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
+                          "text/plain", NULL, len);
+    wifi_SockdSendN(6, g_httpHeader, "{\"url1\":\"", url1, "\",\"url2\":\"",
+                    url2, "\"}");
+  } else if (!authenticated) {
+    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 403, "Forbidden",
+                          "text/plain", NULL, 21);
+    wifi_SockdSendN(2, g_httpHeader, "authentication failed");
+  } else if (!error) {
+    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
+                          "text/plain", NULL, 7);
+    wifi_SockdSendN(2, g_httpHeader, "success");
+  } else {
+    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 400, "Bad Request",
+                          "text/plain", NULL, 5);
+    wifi_SockdSendN(2, g_httpHeader, "error");
+  }
+
+  if (saveWifiConfig) {
     wifi_SoftReset();
   }
 }

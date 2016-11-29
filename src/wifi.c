@@ -176,29 +176,38 @@ static void atReset(WifiAt *at) {
 static void atCmdPrepare(void) {
   WifiData *wifi = &g_wifiData;
 
+  while (wifi->processing)
+    ;
+
   wifi_WaitState(WIFI_STATE_CONSOLE_ACTIVE);
 
-#if false
-  if (!(wifi->state & WIFI_STATE_SOCKD_CLIENT_ACTIVE)) {
-    // Because of a bug in the WiFi module firmware, the socket server cannot
-    // be active while we perform an AT command and there is no client
-    // connected. If a client were to connect while we are performing the AT
-    // command, the AT command will not complete before the client has
-    // disconnected.
-    wifi_StopSockd();
-  }
+  while (wifi->processing)
+    ;
 
-  enterCommandMode();
-#else
-  // The WiFi firmware has a bug where the socket data can be output before any
-  // WINDs if a client disconnects at the right time, with all four socket WINDs
-  // following thereafter. Even though it would be nice not to disconnect
-  // clients here, we cannot guarantee that a client won't disconnect between
-  // entering command mode and performing the AT command. This could give
-  // another client a chance to connect during this window and corrupt our AT
-  // command.
-  wifi_StopSockd();
-#endif
+  if (!(wifi->state & WIFI_STATE_SOCKD_SAFE_CLIENT_ACTIVE)) {
+    // There are multiple bugs in the WiFi module socket server implementation,
+    // due to which we must stop the socket server to ensure maximum safety
+    // (from unpredictable clients):
+    //
+    // * When a socket client connects while the WiFi module is performing an AT
+    //   command, the AT command will not complete (return OK / ERROR) until the
+    //   socket client has disconnected
+    // * When a socket client disconnects at just the right time, the data from
+    //   the client can be outputted on the UART before the WINDs indicating
+    //   that a client has connected and that we're in Data Mode. After the data
+    //   has been dumped on the USART, it is followed by all four WINDs (too
+    //   late)
+    // * Etc...
+    //
+    // For the reasons stated above, unless the safe client flag has been set
+    // (e.g. client authenticated), we stop the socket server while issuing the
+    // AT command.
+    wifi_StopSockd();
+  } else {
+    // Safe client flag is set, so we trust that Data / Command mode will behave
+    // as expected.
+    enterCommandMode();
+  }
 }
 
 // wifi_AtCmdWait waits until we recieve the entire AT response and returns true
@@ -450,6 +459,14 @@ void wifi_SockdHandler(void) {
   }
 }
 
+void wifi_SockdIsSafeClient(void) {
+  WifiData *wifi = &g_wifiData;
+
+  if (wifi->state & WIFI_STATE_SOCKD_CLIENT_ACTIVE) {
+    wifi->state |= WIFI_STATE_SOCKD_SAFE_CLIENT_ACTIVE;
+  }
+}
+
 // wifi_StartSockd starts the socket server, returning true if the server was
 // started or is already running. Will wait (blocking) for
 // WIFI_STATE_HARDWARE_STARTED.
@@ -503,6 +520,7 @@ bool wifi_StopSockd(void) {
 
   if (wifi_AtCmdWait()) {
     wifi->state &= ~(WIFI_STATE_SOCKD_STARTED | WIFI_STATE_SOCKD_CLIENT_ACTIVE |
+                     WIFI_STATE_SOCKD_SAFE_CLIENT_ACTIVE |
                      WIFI_STATE_SOCKD_PENDING_DATA | WIFI_STATE_DATA_MODE);
     return true;
   }
@@ -1010,8 +1028,9 @@ static bool processWind(volatile WifiState *state, uint8_t *const buff) {
     break;
 
   case WIND_SOCKD_CLIENT_CLOSE:
-    *state &= ~(WIFI_STATE_SOCKD_CLIENT_ACTIVE | WIFI_STATE_SOCKD_PENDING_DATA |
-                WIFI_STATE_DATA_MODE);
+    *state &=
+        ~(WIFI_STATE_SOCKD_CLIENT_ACTIVE | WIFI_STATE_SOCKD_SAFE_CLIENT_ACTIVE |
+          WIFI_STATE_SOCKD_PENDING_DATA | WIFI_STATE_DATA_MODE);
     break;
 
   case WIND_SOCKD_DROPPED_DATA:

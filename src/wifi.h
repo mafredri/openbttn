@@ -40,9 +40,10 @@
 #define WIFI_STATE_COMMAND_MODE_REQUESTED (uint16_t)(1 << 7)
 #define WIFI_STATE_SOCKD_STARTED (uint16_t)(1 << 8)
 #define WIFI_STATE_SOCKD_CLIENT_ACTIVE (uint16_t)(1 << 9)
-#define WIFI_STATE_SOCKD_PENDING_DATA (uint16_t)(1 << 10)
-#define WIFI_STATE_SOCKD_DATA_AVAILABLE (uint16_t)(1 << 11)
-#define WIFI_STATE_HARDWARE_STARTED (uint16_t)(1 << 12)
+#define WIFI_STATE_SOCKD_SAFE_CLIENT_ACTIVE (uint16_t)(1 << 10)
+#define WIFI_STATE_SOCKD_PENDING_DATA (uint16_t)(1 << 11)
+#define WIFI_STATE_SOCKD_DATA_AVAILABLE (uint16_t)(1 << 12)
+#define WIFI_STATE_HARDWARE_STARTED (uint16_t)(1 << 13)
 
 #define AT_STATUS_CLEAR (uint8_t)(0)
 #define AT_STATUS_PENDING (uint8_t)(1 << 1)
@@ -180,6 +181,7 @@ void wifi_ApplyConfig(WifiConfig *config);
 bool wifi_OtaUpdate(char *url);
 bool wifi_SockdStarted(void);
 void wifi_SockdHandler(void);
+void wifi_SockdIsSafeClient(void);
 bool wifi_StartSockd(uint16_t port);
 bool wifi_StopSockd(void);
 uint8_t *wifi_SockdGetData(void);
