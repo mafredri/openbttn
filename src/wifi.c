@@ -330,15 +330,11 @@ void wifi_CreateFileInRam(const char *name, const char *header,
 
 void wifi_EnableFirstConfig(const char *ssid) {
   wifi_AtCmdBlocking("AT&F");
+
+  wifi_AtCmdBlocking("AT+S.SCFG=wifi_mode,3");      // MiniAP mode.
+  wifi_AtCmdBlocking("AT+S.SCFG=wifi_priv_mode,0"); // Open system.
   wifi_AtCmdN(2, "AT+S.SSIDTXT=", ssid);
   wifi_AtCmdWait();
-
-  wifi_AtCmdBlocking("AT+S.SCFG=console1_hwfc,0");
-  wifi_AtCmdBlocking("AT+S.SCFG=wifi_mode,3");      // MiniAP mode.
-  wifi_AtCmdBlocking("AT+S.SCFG=ip_use_decoder,0"); // Use RAW for output.
-  wifi_AtCmdBlocking("AT+S.SCFG=ip_use_cgis,0");    // Disable all CGIs.
-  wifi_AtCmdBlocking("AT+S.SCFG=ip_use_ssis,F");    // Enable all SSIs.
-  wifi_AtCmdBlocking("AT+S.SCFG=wifi_priv_mode,0");
 
   wifi_AtCmdBlocking("AT+S.SCFG=ip_use_dhcp,2"); // Customise IP.
   wifi_AtCmdBlocking("AT+S.SCFG=ip_ipaddr,192.168.1.1");
@@ -360,11 +356,8 @@ void wifi_ApplyConfig(WifiConfig *config) {
 
   wifi_AtCmdBlocking("AT&F"); // Factory reset.
 
-  wifi_AtCmdBlocking("AT+S.SCFG=console1_hwfc,0");
   wifi_AtCmdBlocking("AT+S.SCFG=wifi_mode,1");   // Station mode.
   wifi_AtCmdBlocking("AT+S.SCFG=ip_use_cgis,0"); // Disable all CGIs.
-  wifi_AtCmdBlocking("AT+S.SCFG=ip_use_ssis,F"); // Enable all SSIs.
-  wifi_AtCmdBlocking("AT+S.SCFG=ip_use_decoder,0");
 
   // Set the SSID we should to connect to.
   wifi_AtCmdN(2, "AT+S.SSIDTXT=", config->ssid);
