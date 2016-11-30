@@ -35,15 +35,16 @@
 #define WIFI_STATE_JOINED (uint16_t)(1 << 2)
 #define WIFI_STATE_ASSOCIATED (uint16_t)(1 << 3)
 #define WIFI_STATE_UP (uint16_t)(1 << 4)
-#define WIFI_STATE_FW_UPDATE_COMPLETE (uint16_t)(1 << 5)
-#define WIFI_STATE_DATA_MODE (uint16_t)(1 << 6)
-#define WIFI_STATE_COMMAND_MODE_REQUESTED (uint16_t)(1 << 7)
-#define WIFI_STATE_SOCKD_STARTED (uint16_t)(1 << 8)
-#define WIFI_STATE_SOCKD_CLIENT_ACTIVE (uint16_t)(1 << 9)
-#define WIFI_STATE_SOCKD_SAFE_CLIENT_ACTIVE (uint16_t)(1 << 10)
-#define WIFI_STATE_SOCKD_PENDING_DATA (uint16_t)(1 << 11)
-#define WIFI_STATE_SOCKD_DATA_AVAILABLE (uint16_t)(1 << 12)
-#define WIFI_STATE_HARDWARE_STARTED (uint16_t)(1 << 13)
+#define WIFI_STATE_FW_UPDATE_PENDING (uint16_t)(1 << 5)
+#define WIFI_STATE_FW_UPDATE_COMPLETE (uint16_t)(1 << 6)
+#define WIFI_STATE_DATA_MODE (uint16_t)(1 << 7)
+#define WIFI_STATE_COMMAND_MODE_REQUESTED (uint16_t)(1 << 8)
+#define WIFI_STATE_SOCKD_STARTED (uint16_t)(1 << 9)
+#define WIFI_STATE_SOCKD_CLIENT_ACTIVE (uint16_t)(1 << 10)
+#define WIFI_STATE_SOCKD_SAFE_CLIENT_ACTIVE (uint16_t)(1 << 11)
+#define WIFI_STATE_SOCKD_PENDING_DATA (uint16_t)(1 << 12)
+#define WIFI_STATE_SOCKD_DATA_AVAILABLE (uint16_t)(1 << 13)
+#define WIFI_STATE_HARDWARE_STARTED (uint16_t)(1 << 14)
 
 #define AT_STATUS_CLEAR (uint8_t)(0)
 #define AT_STATUS_PENDING (uint8_t)(1 << 1)
@@ -84,19 +85,16 @@ struct WifiAt {
 
 typedef struct WifiConfig WifiConfig;
 struct WifiConfig {
-  char otaUrl[WIFI_URL_LENGTH + 1];
   char userDesc[WIFI_CONFIG_USER_DESC_LENGTH + 1];
   char ssid[WIFI_CONFIG_SSID_LENGTH + 1];
   char wpaPsk[WIFI_CONFIG_WPA_PSK_LENGTH + 1];
-  uint8_t privMode;
-  uint8_t wifiMode;
-  uint8_t dhcp;
   char ipAddr[15 + 1];
   char ipNetmask[15 + 1];
   char ipGateway[15 + 1];
   char ipDns[15 + 1];
-  bool commit;
-  bool otaPending;
+  uint8_t privMode;
+  uint8_t wifiMode;
+  uint8_t dhcp;
 };
 
 typedef struct WifiBuff WifiBuff;
@@ -178,7 +176,8 @@ int wifi_CreateHttpHeader(char *dest, int len, int status,
 void wifi_CreateFileInRam(const char *name, const char *header,
                           const char *data, uint16_t dataSize);
 void wifi_ApplyConfig(WifiConfig *config);
-bool wifi_OtaUpdate(char *url);
+bool wifi_OtaDownload(char *url);
+bool wifi_OtaComplete(void);
 bool wifi_SockdStarted(void);
 void wifi_SockdHandler(void);
 void wifi_SockdIsSafeClient(void);

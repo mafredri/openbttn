@@ -410,8 +410,8 @@ void wifi_ApplyConfig(WifiConfig *config) {
   wifi_AtCmdBlocking("AT&W"); // Write settings.
 }
 
-// wifi_OtaUpdate performs a firmware OTA update for the WiFi module.
-bool wifi_OtaUpdate(char *url) {
+// wifi_OtaDownload performs a firmware OTA update for the WiFi module.
+bool wifi_OtaDownload(char *url) {
   WifiData *wifi = &g_wifiData;
 
   wifi_AtCmdN(2, "AT+S.FWUPDATE=", url);
@@ -423,10 +423,21 @@ bool wifi_OtaUpdate(char *url) {
     return false;
   }
 
+  if (strstr((char *)wifi->at->buff, "Complete!")) {
+    wifi->state |= WIFI_STATE_FW_UPDATE_PENDING;
+    return true;
+  }
+
+  return false;
+}
+
+// wifi_OtaComplete finalises the OTA update by rebooting the WiFi module to
+// write the firmware, if successfull, returns true.
+bool wifi_OtaComplete(void) {
+  WifiData *wifi = &g_wifiData;
+
   // Issue a reset ("AT+CFUN=1") to complete the firmware update.
   wifi_SoftReset();
-
-  wifi_WaitState(WIFI_STATE_POWER_ON);
 
   // Between "AT+CFUN=1" (soft reset) and power on, we should have received
   // "+WIND:17:F/W update complete!", if not the firmware update probably

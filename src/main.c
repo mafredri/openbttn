@@ -14,18 +14,19 @@
 volatile uint32_t g_SystemTick = 0;
 volatile uint32_t g_SystemDelay = 0;
 
-static char g_httpHeader[HTTP_HEADER_LENGTH] = {0};
+static char g_httpHeader[HTTP_HEADER_LENGTH];
 
-typedef enum RecoveryAction RecoveryAction;
-enum RecoveryAction {
-  RECOVERY_WIFI_SAVE_CONFIG,
-  RECOVERY_WIFI_OTA_UPDATE,
-  RECOVERY_NONE = 0xFF,
+typedef struct RecoveryRequest RecoveryRequest;
+struct RecoveryRequest {
+  WifiConfig *wifiConfig;
+  char otaUrl[WIFI_URL_LENGTH + 1];
+  bool applyConfig;
+  bool otaUpdate;
 };
 
 static void processSocketData(char *data);
-static RecoveryAction recoveryProcessSocketData(WifiConfig *wifiConfig,
-                                                char *data);
+static bool recoveryProcessSocketData(RecoveryRequest *request, char *data);
+static bool shouldEnterRecovery(void);
 static void enterRecovery(void);
 static void clockSetup(void);
 static void gpioSetup(void);
@@ -56,77 +57,102 @@ int main(void) {
 
   conf_Init();
 
-  if (button_IsPressed()) {
-    // Tick speed 800, handler uses 6 ticks and we trigger already on 5th. This
-    // gives us recovery after 4000ms (1000 * 5 = 4000ms).
-    led_TickConfigure(800, g_SystemTick, &led_TickHandlerRecovery);
-    led_TickEnable();
+  if (shouldEnterRecovery()) { // Press button for 4s during startup.
+    WifiConfig wifiConfig;
+    RecoveryRequest request;
+    request.wifiConfig = &wifiConfig;
+    char *socketData = NULL;
+    bool success = false;
 
-    // Wait until button is released or 4000ms has passed.
-    while (button_IsPressed() && button_PressedDuration() < 4000)
-      ;
+    enterRecovery(); // Initialise recovery mode.
 
-    led_TickDisable();
+    // Recovery loop, can only be exited by system reset.
+    while (true) {
+      // Make sure the socket server is running.
+      if (!wifi_SockdStarted()) {
+        wifi_StartSockd(8774);
+      }
+      // Handle state changes for the socket server.
+      wifi_SockdHandler();
 
-    if (button_PressedDuration() < 4000) {
-      // Button was pressed <4s, reset leds and resume normal boot.
-      led_TickDisable();
-      led_Set(0);
-    } else {
-      // Button was pressed for 4s, enter recovery mode.
-      WifiConfig wifiConfig;
-      enterRecovery();
+      socketData = (char *)wifi_SockdGetData();
+      if (!socketData) {
+        continue;
+      }
 
-      char *socketData = NULL;
-      RecoveryAction action;
-      while (true) {
-        action = RECOVERY_NONE;
+      success = recoveryProcessSocketData(&request, socketData);
+      wifi_SockdIsSafeClient();
+      wifi_SockdClearData(); // Data has been processed.
 
-        // Make sure the socket server is running.
-        if (!wifi_SockdStarted()) {
-          wifi_StartSockd(8774);
-        }
-        // Handle state changes for the socket server.
-        wifi_SockdHandler();
+      if (!success) {
+        const char msg[] = "Could not process request.";
+        wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 400,
+                              "Bad Request", "text/plain", NULL, strlen(msg));
+        wifi_SockdSendN(2, g_httpHeader, msg);
+      } else if (request.otaUpdate) {
+        request.otaUpdate = false; // No not process request multiple times.
 
-        socketData = (char *)wifi_SockdGetData();
-        if (socketData) {
-          action = recoveryProcessSocketData(&wifiConfig, socketData);
-          socketData = NULL;
-          wifi_SockdClearData();
-        }
+        led_TickConfigure(1000, g_SystemTick, &led_TickHandlerRecoveryLoading);
+        led_TickEnable();
 
-        switch (action) {
-        case RECOVERY_WIFI_OTA_UPDATE:
-          led_TickConfigure(1000, g_SystemTick,
-                            &led_TickHandlerRecoveryLoading);
-          led_TickEnable();
+        if (wifi_OtaDownload(request.otaUrl)) {
+          const char msg[] = "OTA update downloaded successfully, rebooting "
+                             "to finalise. See LEDs for status and reconnect "
+                             "to the OpenBttn Wi-Fi network.";
+          wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
+                                "text/plain", NULL, strlen(msg));
+          wifi_SockdSendN(2, g_httpHeader, msg);
 
-          if (wifi_OtaUpdate(wifiConfig.otaUrl)) {
-            led_TickDisable();
-            led_Set((0x3F << 8));
+          led_TickDisable();
+          if (wifi_OtaComplete()) {
+            led_Set((0x3F << 8)); // Indicate success through LEDs.
           } else {
             printf("Failed to perform OTA update on WiFi module!\n");
-            led_TickDisable();
+
+            // Indicate error through LEDs.
             led_TickConfigure(200, g_SystemTick, &led_TickHandlerError);
             led_TickEnable();
-
-            wifi_HardReset(); // Power cycle the Wi-Fi module just in case.
           }
-
-          delay(5000); // Display success / error LEDs for extended period.
+        } else {
+          const char msg[] =
+              "Error downloading OTA update, please try again...";
+          printf("Failed to download OTA update for WiFi module!\n");
           led_TickDisable();
-          led_Set(0);
 
-          enterRecovery(); // Restore recovery state after OTA reset.
-          break;
-        case RECOVERY_WIFI_SAVE_CONFIG:
-          wifi_ApplyConfig(&wifiConfig);
-          scb_reset_system(); // System reset!
-          break;
-        case RECOVERY_NONE:
-          break;
+          // Indicate error through LEDs.
+          led_TickConfigure(200, g_SystemTick, &led_TickHandlerError);
+          led_TickEnable();
+
+          wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 500,
+                                "Internal Server Error", "text/plain", NULL,
+                                strlen(msg));
+          wifi_SockdSendN(2, g_httpHeader, msg);
+
+          delay(5000); // Show error status for 5000 ms.
+          led_TickDisable();
+          led_Set((0x3F << 16)); // Restore recovery (blue) LEDs.
+          continue;              // Restart recovery loop (no restart happened).
         }
+
+        delay(5000); // Show status for 5000 ms.
+        led_TickDisable();
+        led_Set(0);
+        enterRecovery(); // Restore recovery state after OTA reset.
+      } else if (request.applyConfig) {
+        const char msg[] = "Configuration applied! Rebooting...";
+
+        request.applyConfig = false; // Avoid processing multiple times.
+
+        // We must respond to the user before applying the configuration,
+        // otherwise the network communication will not work.
+        wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
+                              "text/plain", NULL, strlen(msg));
+        wifi_SockdSendN(2, g_httpHeader, msg);
+
+        // Apply the user provided configuration.
+        wifi_ApplyConfig(request.wifiConfig);
+
+        scb_reset_system(); // Perform full system reset.
       }
     }
   }
@@ -134,28 +160,26 @@ int main(void) {
   led_TickConfigure(500, g_SystemTick, &led_TickHandlerBoot);
   led_TickEnable();
 
-  wifi_CreateHttpHeader(&g_httpHeader[0], HTTP_HEADER_LENGTH, 200, "OK",
+  wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
                         "text/html", "gzip", DATA_INDEX_HTML_GZ_LENGTH);
-  wifi_CreateFileInRam("index.html", &g_httpHeader[0],
-                       (char *)&g_DataIndexHtmlGz[0],
+  wifi_CreateFileInRam("index.html", g_httpHeader, (char *)g_DataIndexHtmlGz,
                        DATA_INDEX_HTML_GZ_LENGTH);
 
   printf("Waiting for WIFI UP...\n");
   wifi_WaitState(WIFI_STATE_UP);
 
-  // WIFI is up, power off leds.
+  // Indicate successfull bootup by displaying green leds for 2.5 seconds.
   led_TickDisable();
   led_Set(0x3F << 8);
   delay(2500);
   led_Set(0);
 
-  button_Reset();
+  button_Reset(); // Reset button before main loop.
 
   printf("Entering main loop!\n");
 
   char *socketData = NULL;
   while (true) {
-
     // Make sure the socket server is running.
     if (!wifi_SockdStarted()) {
       wifi_StartSockd(8774);
@@ -166,7 +190,6 @@ int main(void) {
     socketData = (char *)wifi_SockdGetData();
     if (socketData) {
       processSocketData(socketData);
-      socketData = NULL;
       wifi_SockdClearData();
     }
 
@@ -288,14 +311,13 @@ void processSocketData(char *data) {
       }
     } else if (parseParamValue(&value, pch, "url1")) {
       conf_Set(CONF_URL1, value);
+      saveConfig = true;
     } else if (parseParamValue(&value, pch, "url2")) {
       conf_Set(CONF_URL2, value);
+      saveConfig = true;
     } else if (parseParamValue(&value, pch, "password")) {
       conf_Set(CONF_PASSWORD, value);
-    } else if (parseParamValue(&value, pch, "save")) {
-      if (*value == '1') {
-        saveConfig = true;
-      }
+      saveConfig = true;
     } else {
       error = true;
       break;
@@ -317,23 +339,24 @@ void processSocketData(char *data) {
     wifi_SockdSendN(6, g_httpHeader, "{\"url1\":\"", url1, "\",\"url2\":\"",
                     url2, "\"}");
   } else if (!authenticated) {
+    const char msg[] = "Authentication failed!";
     wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 403, "Forbidden",
-                          "text/plain", NULL, 21);
-    wifi_SockdSendN(2, g_httpHeader, "authentication failed");
+                          "text/plain", NULL, strlen(msg));
+    wifi_SockdSendN(2, g_httpHeader, msg);
   } else if (!error) {
+    const char msg[] = "Success!";
     wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
-                          "text/plain", NULL, 7);
-    wifi_SockdSendN(2, g_httpHeader, "success");
+                          "text/plain", NULL, strlen(msg));
+    wifi_SockdSendN(2, g_httpHeader, msg);
   } else {
+    const char msg[] = "Could not process request!";
     wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 400, "Bad Request",
-                          "text/plain", NULL, 5);
-    wifi_SockdSendN(2, g_httpHeader, "error");
+                          "text/plain", NULL, strlen(msg));
+    wifi_SockdSendN(2, g_httpHeader, msg);
   }
 }
 
-static RecoveryAction recoveryProcessSocketData(WifiConfig *wifiConfig,
-                                                char *data) {
-  RecoveryAction action = RECOVERY_NONE;
+static bool recoveryProcessSocketData(RecoveryRequest *request, char *data) {
   bool error = false;
   char *pch = NULL;
   char *value = NULL;
@@ -348,30 +371,38 @@ static RecoveryAction recoveryProcessSocketData(WifiConfig *wifiConfig,
     if (parseParamValue(&value, pch, "password")) {
       conf_Set(CONF_PASSWORD, value);
       conf_Save();
-      strncpy(wifiConfig->userDesc, conf_Get(CONF_PASSWORD),
-              sizeof(wifiConfig->userDesc));
+      strncpy(request->wifiConfig->userDesc, conf_Get(CONF_PASSWORD),
+              sizeof request->wifiConfig->userDesc);
     } else if (parseParamValue(&value, pch, "ssid")) {
-      strncpy(wifiConfig->ssid, value, sizeof(wifiConfig->ssid));
-      action = RECOVERY_WIFI_SAVE_CONFIG;
+      strncpy(request->wifiConfig->ssid, value,
+              sizeof request->wifiConfig->ssid);
+
+      // Arbitrarily, we pick SSID as an indication that config have changed.
+      request->applyConfig = true;
     } else if (parseParamValue(&value, pch, "wpa_psk")) {
-      strncpy(wifiConfig->wpaPsk, value, sizeof(wifiConfig->wpaPsk));
+      strncpy(request->wifiConfig->wpaPsk, value,
+              sizeof request->wifiConfig->wpaPsk);
     } else if (parseParamValue(&value, pch, "priv_mode")) {
-      wifiConfig->privMode = (uint8_t)atoi(value);
+      request->wifiConfig->privMode = (uint8_t)atoi(value);
     } else if (parseParamValue(&value, pch, "wifi_mode")) {
-      wifiConfig->wifiMode = (uint8_t)atoi(value);
+      request->wifiConfig->wifiMode = (uint8_t)atoi(value);
     } else if (parseParamValue(&value, pch, "dhcp")) {
-      wifiConfig->dhcp = (uint8_t)atoi(value);
+      request->wifiConfig->dhcp = (uint8_t)atoi(value);
     } else if (parseParamValue(&value, pch, "ip_addr")) {
-      strncpy(wifiConfig->ipAddr, value, sizeof(wifiConfig->ipAddr));
+      strncpy(request->wifiConfig->ipAddr, value,
+              sizeof request->wifiConfig->ipAddr);
     } else if (parseParamValue(&value, pch, "ip_netmask")) {
-      strncpy(wifiConfig->ipNetmask, value, sizeof(wifiConfig->ipNetmask));
+      strncpy(request->wifiConfig->ipNetmask, value,
+              sizeof request->wifiConfig->ipNetmask);
     } else if (parseParamValue(&value, pch, "ip_gateway")) {
-      strncpy(wifiConfig->ipGateway, value, sizeof(wifiConfig->ipGateway));
+      strncpy(request->wifiConfig->ipGateway, value,
+              sizeof request->wifiConfig->ipGateway);
     } else if (parseParamValue(&value, pch, "ip_dns")) {
-      strncpy(wifiConfig->ipDns, value, sizeof(wifiConfig->ipDns));
+      strncpy(request->wifiConfig->ipDns, value,
+              sizeof request->wifiConfig->ipDns);
     } else if (parseParamValue(&value, pch, "ota")) {
-      strncpy(wifiConfig->otaUrl, value, sizeof(wifiConfig->otaUrl));
-      action = RECOVERY_WIFI_OTA_UPDATE;
+      strncpy(request->otaUrl, value, sizeof request->otaUrl);
+      request->otaUpdate = true;
     } else {
       error = true;
       break;
@@ -380,17 +411,33 @@ static RecoveryAction recoveryProcessSocketData(WifiConfig *wifiConfig,
     pch = strtok(NULL, "\r\n");
   }
 
-  if (!error) {
-    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
-                          "text/plain", NULL, 7);
-    wifi_SockdSendN(2, g_httpHeader, "success");
-  } else {
-    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 400, "Bad Request",
-                          "text/plain", NULL, 5);
-    wifi_SockdSendN(2, g_httpHeader, "error");
+  return !error;
+}
+
+static bool shouldEnterRecovery(void) {
+  if (!button_IsPressed()) {
+    return false;
   }
 
-  return action;
+  // Tick speed 800, handler uses 6 ticks and we trigger already on 5th. This
+  // gives us recovery after 4000ms (1000 * 5 = 4000ms).
+  led_TickConfigure(800, g_SystemTick, &led_TickHandlerRecovery);
+  led_TickEnable();
+
+  // Wait until button is released or 4000ms has passed.
+  while (button_IsPressed() && button_PressedDuration() < 4000)
+    ;
+
+  led_TickDisable();
+
+  if (button_PressedDuration() < 4000) {
+    // Button was pressed <4s, reset leds and resume normal boot.
+    led_Set(0);
+    return false;
+  }
+
+  // Button was pressed for 4s, enter recovery mode.
+  return true;
 }
 
 static void enterRecovery(void) {
@@ -400,10 +447,10 @@ static void enterRecovery(void) {
   led_TickEnable();
 
   wifi_EnableFirstConfig("OpenBttn");
-  wifi_CreateHttpHeader(&g_httpHeader[0], HTTP_HEADER_LENGTH, 200, "OK",
+  wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
                         "text/html", "gzip", DATA_FIRSTSET_HTML_GZ_LENGTH);
-  wifi_CreateFileInRam("firstset.html", &g_httpHeader[0],
-                       (char *)&g_DataFirstsetHtmlGz[0],
+  wifi_CreateFileInRam("firstset.html", g_httpHeader,
+                       (char *)g_DataFirstsetHtmlGz,
                        DATA_FIRSTSET_HTML_GZ_LENGTH);
 
   wifi_WaitState(WIFI_STATE_UP);
