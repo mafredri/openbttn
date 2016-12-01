@@ -279,6 +279,7 @@ uint16_t wifi_HttpGet(char *url) {
 
 const char httpHeaderTpl[] = "HTTP/1.0 %d %s\n"
                              "Server: OpenBttn\n"
+                             "Access-Control-Allow-Origin: *\n"
                              "Content-Type: %s\n"
                              "%s" // "Content-Encoding: %s\n"
                              "Content-Length: %d\n\n";

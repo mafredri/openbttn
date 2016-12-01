@@ -62,7 +62,7 @@
 #define WIFI_FILE_MAX_SIZE 4096
 #define WIFI_URL_LENGTH 200
 
-#define HTTP_HEADER_LENGTH 140
+#define HTTP_HEADER_LENGTH 180
 #define HTTP_HEADER_ENCODING_LENGTH                                            \
   (18 + 8) // Longest encodings are "compress" and "identity" (8 chars).
 
