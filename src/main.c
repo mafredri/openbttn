@@ -16,18 +16,28 @@ volatile uint32_t g_SystemDelay = 0;
 
 static char g_httpHeader[HTTP_HEADER_LENGTH];
 
-typedef struct RecoveryRequest RecoveryRequest;
-struct RecoveryRequest {
+typedef struct SockRequest SockRequest;
+struct SockRequest {
+  bool auth;
+  bool saveConfig;
+  bool dumpConfig;
+};
+
+static bool parseParamValue(char **dest, char *const src, char *param);
+static bool processSockRequest(SockRequest *request, char *data);
+
+typedef struct RecoverySockRequest RecoverySockRequest;
+struct RecoverySockRequest {
   WifiConfig *wifiConfig;
   char otaUrl[WIFI_URL_LENGTH + 1];
   bool applyConfig;
   bool otaUpdate;
 };
-
-static void processSocketData(char *data);
-static bool recoveryProcessSocketData(RecoveryRequest *request, char *data);
 static bool shouldEnterRecovery(void);
-static void enterRecovery(void);
+static void enterRecoveryMain(void);
+static void initRecoveryMode(void);
+static bool processRecoverySockRequest(RecoverySockRequest *request,
+                                       char *data);
 static void clockSetup(void);
 static void gpioSetup(void);
 
@@ -58,103 +68,7 @@ int main(void) {
   conf_Init();
 
   if (shouldEnterRecovery()) { // Press button for 4s during startup.
-    WifiConfig wifiConfig;
-    RecoveryRequest request;
-    request.wifiConfig = &wifiConfig;
-    char *socketData = NULL;
-    bool success = false;
-
-    enterRecovery(); // Initialise recovery mode.
-
-    // Recovery loop, can only be exited by system reset.
-    while (true) {
-      // Make sure the socket server is running.
-      if (!wifi_SockdStarted()) {
-        wifi_StartSockd(8774);
-      }
-      // Handle state changes for the socket server.
-      wifi_SockdHandler();
-
-      socketData = (char *)wifi_SockdGetData();
-      if (!socketData) {
-        continue;
-      }
-
-      success = recoveryProcessSocketData(&request, socketData);
-      wifi_SockdIsSafeClient();
-      wifi_SockdClearData(); // Data has been processed.
-
-      if (!success) {
-        const char msg[] = "Could not process request.";
-        wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 400,
-                              "Bad Request", "text/plain", NULL, strlen(msg));
-        wifi_SockdSendN(2, g_httpHeader, msg);
-      } else if (request.otaUpdate) {
-        request.otaUpdate = false; // No not process request multiple times.
-
-        led_TickConfigure(1000, g_SystemTick, &led_TickHandlerRecoveryLoading);
-        led_TickEnable();
-
-        if (wifi_OtaDownload(request.otaUrl)) {
-          const char msg[] = "OTA update downloaded successfully, rebooting "
-                             "to finalise. See LEDs for status and reconnect "
-                             "to the OpenBttn Wi-Fi network.";
-          wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
-                                "text/plain", NULL, strlen(msg));
-          wifi_SockdSendN(2, g_httpHeader, msg);
-
-          led_TickDisable();
-          if (wifi_OtaComplete()) {
-            led_Set((0x3F << 8)); // Indicate success through LEDs.
-          } else {
-            printf("Failed to perform OTA update on WiFi module!\n");
-
-            // Indicate error through LEDs.
-            led_TickConfigure(200, g_SystemTick, &led_TickHandlerError);
-            led_TickEnable();
-          }
-        } else {
-          const char msg[] =
-              "Error downloading OTA update, please try again...";
-          printf("Failed to download OTA update for WiFi module!\n");
-          led_TickDisable();
-
-          // Indicate error through LEDs.
-          led_TickConfigure(200, g_SystemTick, &led_TickHandlerError);
-          led_TickEnable();
-
-          wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 500,
-                                "Internal Server Error", "text/plain", NULL,
-                                strlen(msg));
-          wifi_SockdSendN(2, g_httpHeader, msg);
-
-          delay(5000); // Show error status for 5000 ms.
-          led_TickDisable();
-          led_Set((0x3F << 16)); // Restore recovery (blue) LEDs.
-          continue;              // Restart recovery loop (no restart happened).
-        }
-
-        delay(5000); // Show status for 5000 ms.
-        led_TickDisable();
-        led_Set(0);
-        enterRecovery(); // Restore recovery state after OTA reset.
-      } else if (request.applyConfig) {
-        const char msg[] = "Configuration applied! Rebooting...";
-
-        request.applyConfig = false; // Avoid processing multiple times.
-
-        // We must respond to the user before applying the configuration,
-        // otherwise the network communication will not work.
-        wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
-                              "text/plain", NULL, strlen(msg));
-        wifi_SockdSendN(2, g_httpHeader, msg);
-
-        // Apply the user provided configuration.
-        wifi_ApplyConfig(request.wifiConfig);
-
-        scb_reset_system(); // Perform full system reset.
-      }
-    }
+    enterRecoveryMain();       // Exit by system reset.
   }
 
   led_TickConfigure(500, g_SystemTick, &led_TickHandlerBoot);
@@ -182,20 +96,62 @@ int main(void) {
   while (true) {
     // Make sure the socket server is running.
     if (!wifi_SockdStarted()) {
-      wifi_StartSockd(8774);
+      wifi_StartSockd(SOCKD_PORT);
     }
     // Handle state changes for the socket server.
     wifi_SockdHandler();
 
     socketData = (char *)wifi_SockdGetData();
-    if (socketData) {
-      processSocketData(socketData);
+    if (socketData != NULL) {
+      SockRequest req = {0};
+      bool err = false;
+
+      err = processSockRequest(&req, socketData);
       wifi_SockdClearData();
+
+      if (err) {
+        const char msg[] = "Could not process request";
+        wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 400,
+                              "Bad Request", "text/plain", NULL, strlen(msg));
+        wifi_SockdSendN(2, g_httpHeader, msg);
+        continue;
+      }
+
+      if (!req.auth) {
+        const char msg[] = "Authentication failed!";
+        wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 403,
+                              "Forbidden", "text/plain", NULL, strlen(msg));
+        wifi_SockdSendN(2, g_httpHeader, msg);
+        continue;
+      }
+
+      wifi_SockdIsSafeClient();
+
+      if (req.dumpConfig) {
+        char *url1 = conf_Get(CONF_URL1);
+        char *url2 = conf_Get(CONF_URL2);
+        uint16_t len =
+            21 + strlen(url1) + strlen(url2); // {"url1":"","url2":""}
+        wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
+                              "text/plain", NULL, len);
+        wifi_SockdSendN(6, g_httpHeader, "{\"url1\":\"", url1, "\",\"url2\":\"",
+                        url2, "\"}");
+        continue;
+      }
+
+      if (req.saveConfig) {
+        conf_Save();
+      }
+
+      const char msg[] = "Success!";
+      wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
+                            "text/plain", NULL, strlen(msg));
+      wifi_SockdSendN(2, g_httpHeader, msg);
     }
 
     if (button_IsPressed() || button_PressedDuration() > 0) {
-      uint16_t httpStatus;
-      char *url;
+      uint16_t httpStatus = 0;
+      char *url = NULL;
 
       // Show the loading indicator for a long press.
       led_TickConfigure(500, g_SystemTick, &led_TickHandlerGreenCircleFill);
@@ -243,7 +199,7 @@ int main(void) {
 
 // parseParamValue parses a string of type "param = value", returns true if the
 // requested param was found and sets the value to dest.
-bool parseParamValue(char **dest, char *const src, char *param) {
+static bool parseParamValue(char **dest, char *const src, char *param) {
   uint8_t len = strlen(param);
   if (strncasecmp(src, param, len) == 0 && strncmp(src + len, " = ", 3) == 0) {
     *dest = src + len + 3;
@@ -253,13 +209,10 @@ bool parseParamValue(char **dest, char *const src, char *param) {
   return false;
 }
 
-// processSocketData takes the data from a POST request to the socket and parses
-// it for authentication and commands / configuration. Returns a HTTP response
-// on the socket.
-void processSocketData(char *data) {
-  bool dumpConfig = false;
-  bool authenticated = false;
-  bool saveConfig = false;
+// processSockRequest processes the data from a socket request and stores the
+// result in a SockRequest. First parameter must be authentication, otherwise
+// the request is rejected.
+static bool processSockRequest(SockRequest *req, char *data) {
   bool error = false;
   char *pch = NULL;
   char *value = NULL;
@@ -272,17 +225,17 @@ void processSocketData(char *data) {
   if (parseParamValue(&value, pch, "auth")) {
     if (strncmp((char *)conf_Get(CONF_PASSWORD), value, CONF_PASSWORD_LENGTH) ==
         0) {
-      authenticated = true;
-      wifi_SockdIsSafeClient();
+      req->auth = true;
     }
   }
   pch = strtok(NULL, "\r\n"); // Next token (after auth).
 
-  while (authenticated && pch != NULL) {
+  while (req->auth && pch != NULL) {
     value = NULL;
 
     if (strncmp(pch, "dump_config", 12) == 0) {
-      dumpConfig = true;
+      req->dumpConfig = true;
+      // Accept no other parameters after dump_config.
       break;
     } else if (parseParamValue(&value, pch, "blink_leds")) {
       char *pNum;
@@ -311,13 +264,13 @@ void processSocketData(char *data) {
       }
     } else if (parseParamValue(&value, pch, "url1")) {
       conf_Set(CONF_URL1, value);
-      saveConfig = true;
+      req->saveConfig = true;
     } else if (parseParamValue(&value, pch, "url2")) {
       conf_Set(CONF_URL2, value);
-      saveConfig = true;
+      req->saveConfig = true;
     } else if (parseParamValue(&value, pch, "password")) {
       conf_Set(CONF_PASSWORD, value);
-      saveConfig = true;
+      req->saveConfig = true;
     } else {
       error = true;
       break;
@@ -326,94 +279,11 @@ void processSocketData(char *data) {
     pch = strtok(NULL, "\r\n");
   }
 
-  if (saveConfig) {
-    conf_Save();
-  }
-
-  if (authenticated && dumpConfig) {
-    char *url1 = conf_Get(CONF_URL1);
-    char *url2 = conf_Get(CONF_URL2);
-    uint16_t len = 21 + strlen(url1) + strlen(url2); // {"url1":"","url2":""}
-    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
-                          "text/plain", NULL, len);
-    wifi_SockdSendN(6, g_httpHeader, "{\"url1\":\"", url1, "\",\"url2\":\"",
-                    url2, "\"}");
-  } else if (!authenticated) {
-    const char msg[] = "Authentication failed!";
-    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 403, "Forbidden",
-                          "text/plain", NULL, strlen(msg));
-    wifi_SockdSendN(2, g_httpHeader, msg);
-  } else if (!error) {
-    const char msg[] = "Success!";
-    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
-                          "text/plain", NULL, strlen(msg));
-    wifi_SockdSendN(2, g_httpHeader, msg);
-  } else {
-    const char msg[] = "Could not process request!";
-    wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 400, "Bad Request",
-                          "text/plain", NULL, strlen(msg));
-    wifi_SockdSendN(2, g_httpHeader, msg);
-  }
+  return error;
 }
 
-static bool recoveryProcessSocketData(RecoveryRequest *request, char *data) {
-  bool error = false;
-  char *pch = NULL;
-  char *value = NULL;
-
-  // Tokenise the data on newlines, each new line represents a new parameter /
-  // value.
-  pch = strtok(data, "\r\n");
-
-  while (pch != NULL) {
-    value = NULL;
-
-    if (parseParamValue(&value, pch, "password")) {
-      conf_Set(CONF_PASSWORD, value);
-      conf_Save();
-      strncpy(request->wifiConfig->userDesc, conf_Get(CONF_PASSWORD),
-              sizeof request->wifiConfig->userDesc);
-    } else if (parseParamValue(&value, pch, "ssid")) {
-      strncpy(request->wifiConfig->ssid, value,
-              sizeof request->wifiConfig->ssid);
-
-      // Arbitrarily, we pick SSID as an indication that config have changed.
-      request->applyConfig = true;
-    } else if (parseParamValue(&value, pch, "wpa_psk")) {
-      strncpy(request->wifiConfig->wpaPsk, value,
-              sizeof request->wifiConfig->wpaPsk);
-    } else if (parseParamValue(&value, pch, "priv_mode")) {
-      request->wifiConfig->privMode = (uint8_t)atoi(value);
-    } else if (parseParamValue(&value, pch, "wifi_mode")) {
-      request->wifiConfig->wifiMode = (uint8_t)atoi(value);
-    } else if (parseParamValue(&value, pch, "dhcp")) {
-      request->wifiConfig->dhcp = (uint8_t)atoi(value);
-    } else if (parseParamValue(&value, pch, "ip_addr")) {
-      strncpy(request->wifiConfig->ipAddr, value,
-              sizeof request->wifiConfig->ipAddr);
-    } else if (parseParamValue(&value, pch, "ip_netmask")) {
-      strncpy(request->wifiConfig->ipNetmask, value,
-              sizeof request->wifiConfig->ipNetmask);
-    } else if (parseParamValue(&value, pch, "ip_gateway")) {
-      strncpy(request->wifiConfig->ipGateway, value,
-              sizeof request->wifiConfig->ipGateway);
-    } else if (parseParamValue(&value, pch, "ip_dns")) {
-      strncpy(request->wifiConfig->ipDns, value,
-              sizeof request->wifiConfig->ipDns);
-    } else if (parseParamValue(&value, pch, "ota")) {
-      strncpy(request->otaUrl, value, sizeof request->otaUrl);
-      request->otaUpdate = true;
-    } else {
-      error = true;
-      break;
-    }
-
-    pch = strtok(NULL, "\r\n");
-  }
-
-  return !error;
-}
-
+// shouldEnterRecovery returns true if the button has been pressed for 4 seconds
+// (or more) during startup, false otherwise.
 static bool shouldEnterRecovery(void) {
   if (!button_IsPressed()) {
     return false;
@@ -440,9 +310,106 @@ static bool shouldEnterRecovery(void) {
   return true;
 }
 
-static void enterRecovery(void) {
-  printf("Enter recovery!\n");
+// enterRecoveryMain enters the main loop for recovery mode.
+static void enterRecoveryMain(void) {
+  char *socketData = NULL;
 
+  printf("Entering recovery mode!\n");
+
+  initRecoveryMode(); // Initialise recovery mode.
+
+  // Recovery loop, can only be exited by system reset.
+  while (true) {
+    // Make sure the socket server is running.
+    if (!wifi_SockdStarted()) {
+      wifi_StartSockd(SOCKD_PORT);
+    }
+    // Handle state changes for the socket server.
+    wifi_SockdHandler();
+
+    socketData = (char *)wifi_SockdGetData();
+    if (socketData != NULL) {
+      WifiConfig wifiConfig = {0};
+      RecoverySockRequest req = {0};
+      req.wifiConfig = &wifiConfig;
+      bool err = false;
+
+      err = processRecoverySockRequest(&req, socketData);
+      wifi_SockdIsSafeClient();
+      wifi_SockdClearData(); // Data has been processed.
+
+      if (err) {
+        const char msg[] = "Could not process request";
+        wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 400,
+                              "Bad Request", "text/plain", NULL, strlen(msg));
+        wifi_SockdSendN(2, g_httpHeader, msg);
+      } else if (req.otaUpdate) {
+        led_TickConfigure(1000, g_SystemTick, &led_TickHandlerRecoveryLoading);
+        led_TickEnable();
+
+        if (wifi_OtaDownload(req.otaUrl)) {
+          const char msg[] = "OTA update downloaded successfully, rebooting "
+                             "to finalise setup";
+          wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
+                                "text/plain", NULL, strlen(msg));
+          wifi_SockdSendN(2, g_httpHeader, msg);
+
+          led_TickDisable();
+          if (wifi_OtaComplete()) {
+            led_Set((0x3F << 8)); // Indicate success through LEDs.
+          } else {
+            printf("Failed to perform OTA update on WiFi module!\n");
+
+            // Indicate error through LEDs.
+            led_TickConfigure(200, g_SystemTick, &led_TickHandlerError);
+            led_TickEnable();
+          }
+        } else {
+          const char msg[] = "Error downloading OTA update";
+          printf("Failed to download OTA update for WiFi module!\n");
+          led_TickDisable();
+
+          // Indicate error through LEDs.
+          led_TickConfigure(200, g_SystemTick, &led_TickHandlerError);
+          led_TickEnable();
+
+          wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 500,
+                                "Internal Server Error", "text/plain", NULL,
+                                strlen(msg));
+          wifi_SockdSendN(2, g_httpHeader, msg);
+
+          delay(5000); // Show error status for 5000 ms.
+          led_TickDisable();
+          led_Set((0x3F << 16)); // Restore recovery (blue) LEDs.
+          continue;              // Restart recovery loop (no restart happened).
+        }
+
+        delay(5000); // Show status for 5000 ms.
+        led_TickDisable();
+        led_Set(0);
+        initRecoveryMode(); // Restore recovery state after OTA reset.
+      } else if (req.applyConfig) {
+        const char msg[] = "Configuration applied! Rebooting...";
+
+        // We must respond to the user before applying the configuration,
+        // otherwise the network communication will not work.
+        wifi_CreateHttpHeader(g_httpHeader, HTTP_HEADER_LENGTH, 200, "OK",
+                              "text/plain", NULL, strlen(msg));
+        wifi_SockdSendN(2, g_httpHeader, msg);
+
+        // Apply the user provided configuration.
+        wifi_ApplyConfig(req.wifiConfig);
+
+        scb_reset_system(); // Perform full system reset.
+      }
+    }
+  }
+}
+
+// initRecoveryMode initialises recovery mode by setting up the OpenBttn
+// hotspot, creating the configuration page and indicating status through
+// LEDs.
+static void initRecoveryMode(void) {
   led_TickConfigure(500, g_SystemTick, &led_TickHandlerRecoveryInit);
   led_TickEnable();
 
@@ -459,6 +426,63 @@ static void enterRecovery(void) {
   led_Set((0x3F << 16)); // Shine blue.
 }
 
+// processRecoverySockRequest processess socket requests in recovery mode.
+static bool processRecoverySockRequest(RecoverySockRequest *req, char *data) {
+  bool error = false;
+  char *pch = NULL;
+  char *value = NULL;
+
+  // Tokenise the data on newlines, each new line represents a new parameter /
+  // value.
+  pch = strtok(data, "\r\n");
+
+  while (pch != NULL) {
+    value = NULL;
+
+    if (parseParamValue(&value, pch, "password")) {
+      conf_Set(CONF_PASSWORD, value);
+      conf_Save();
+      strncpy(req->wifiConfig->userDesc, conf_Get(CONF_PASSWORD),
+              sizeof req->wifiConfig->userDesc);
+    } else if (parseParamValue(&value, pch, "ssid")) {
+      strncpy(req->wifiConfig->ssid, value, sizeof req->wifiConfig->ssid);
+
+      // Arbitrarily, we pick SSID as an indication that config have changed.
+      req->applyConfig = true;
+    } else if (parseParamValue(&value, pch, "wpa_psk")) {
+      strncpy(req->wifiConfig->wpaPsk, value, sizeof req->wifiConfig->wpaPsk);
+    } else if (parseParamValue(&value, pch, "priv_mode")) {
+      req->wifiConfig->privMode = (uint8_t)atoi(value);
+    } else if (parseParamValue(&value, pch, "wifi_mode")) {
+      req->wifiConfig->wifiMode = (uint8_t)atoi(value);
+    } else if (parseParamValue(&value, pch, "dhcp")) {
+      req->wifiConfig->dhcp = (uint8_t)atoi(value);
+    } else if (parseParamValue(&value, pch, "ip_addr")) {
+      strncpy(req->wifiConfig->ipAddr, value, sizeof req->wifiConfig->ipAddr);
+    } else if (parseParamValue(&value, pch, "ip_netmask")) {
+      strncpy(req->wifiConfig->ipNetmask, value,
+              sizeof req->wifiConfig->ipNetmask);
+    } else if (parseParamValue(&value, pch, "ip_gateway")) {
+      strncpy(req->wifiConfig->ipGateway, value,
+              sizeof req->wifiConfig->ipGateway);
+    } else if (parseParamValue(&value, pch, "ip_dns")) {
+      strncpy(req->wifiConfig->ipDns, value, sizeof req->wifiConfig->ipDns);
+    } else if (parseParamValue(&value, pch, "ota")) {
+      strncpy(req->otaUrl, value, sizeof req->otaUrl);
+      req->otaUpdate = true;
+    } else {
+      error = true;
+      break;
+    }
+
+    pch = strtok(NULL, "\r\n");
+  }
+
+  return error;
+}
+
+// SysTick_Handler handles the system and calls maintenance functions for wifi,
+// button and led.
 void SysTick_Handler(void) {
   g_SystemTick++;
   if (g_SystemDelay) {
@@ -476,8 +500,9 @@ void delay(volatile uint32_t ms) {
     ;
 }
 
+// clockSetup configures the bttn clock speed according to CORE_CLOCK.
 static void clockSetup(void) {
-  const struct rcc_clock_scale bttn_clock_config = {
+  const struct rcc_clock_scale bttnClockConfig = {
       .pll_source = RCC_CFGR_PLLSRC_HSE_CLK, // Use HSE
       .pll_mul = RCC_CFGR_PLLMUL_MUL8,
       .pll_div = RCC_CFGR_PLLDIV_DIV2,
@@ -491,14 +516,15 @@ static void clockSetup(void) {
       .apb2_frequency = CORE_CLOCK,
   };
 
-  rcc_clock_setup_pll(&bttn_clock_config);
+  rcc_clock_setup_pll(&bttnClockConfig);
 
-  systick_set_reload((uint32_t)(CORE_CLOCK / 1000)); // 1ms
+  systick_set_reload((uint32_t)(CORE_CLOCK / 1000)); // 1 ms
   systick_set_clocksource(STK_CSR_CLKSOURCE_AHB);
   systick_interrupt_enable();
   systick_counter_enable();
 }
 
+// gpioSetup prepares the general GPIOs on the bttn.
 static void gpioSetup(void) {
   rcc_periph_clock_enable(RCC_GPIOA);
   rcc_periph_clock_enable(RCC_GPIOB);

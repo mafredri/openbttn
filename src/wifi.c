@@ -535,14 +535,19 @@ bool wifi_StopSockd(void) {
   return false;
 }
 
+// wifi_SockdGetData returns a pointer to the socket data buffer, needs to be
+// cleared with wifi_SockdClearData once done.
+// TODO: Rewrite to accept `(char *dest, size_t len);` and clear buffer
+// afterwards.
 uint8_t *wifi_SockdGetData(void) {
   WifiData *wifi = &g_wifiData;
   if (!(wifi->state & WIFI_STATE_SOCKD_DATA_AVAILABLE)) {
-    return 0;
+    return NULL;
   }
   return wifi->sockBuff->buff;
 }
 
+// wifi_SockdClearData clears the socket data buffer.
 void wifi_SockdClearData(void) {
   WifiData *wifi = &g_wifiData;
 
