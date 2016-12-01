@@ -1,13 +1,14 @@
 DEVICE		= stm32l100rc
 OPENCM3_DIR	= ../libopencm3
 
-OBJS		+= main.o debug.o led.o button.o interrupt.o wifi.o ring_buffer.o util.o conf.o data.o
+OBJS		+= main.o debug.o led.o button.o interrupt.o wifi.o ring_buffer.o conf.o data.o
 
 CFLAGS		+= -mcpu=cortex-m3 -mthumb -Os -ggdb3 -std=gnu99
 CFLAGS		+= -fno-common -fno-builtin
 CFLAGS		+= -Wall -Wextra -Wshadow
 CFLAGS		+= -Wall -Wextra -Wimplicit-function-declaration -Wredundant-decls -Wstrict-prototypes -Wundef -Wshadow
 CFLAGS		+= -ffunction-sections -fdata-sections
+CFLAGS		+= -DCM3_ASSERT_VERBOSE
 CPPFLAGS	+= -MD
 LDFLAGS		+= -Wl,--gc-sections
 LDFLAGS		+= -static -nostartfiles

@@ -1,31 +1,40 @@
 'use strict';
 
-// cindMap maps form input names to CIND (custom indication) IDs so that they
-// can be received by the bttn.
-const cinds = {
-	auth: 0,
-	commit: 1,
-	url1: 2,
-	url2: 3,
-	at_cmd: 4,
-};
-cind.register(cinds);
+const authForm = document.getElementById('auth-form');
+const confSection = document.getElementById('conf');
+const configForm = document.getElementById('conf-form');
 
-function fetchConfig() {
-	fetch('/config.json')
-		.then((r) => r.json())
-		.then((c) => {
-			for (let key in c) {
-				let element = document.getElementById(key);
-				if (element) {
-					element.value = at.decodeURL(c[key]);
-				}
-			}
-		});
+function authenticate(authKey) {
+	setRequestAuthKey(authKey);
+	authForm.classList.add('hidden');
+	confSection.classList.remove('hidden');
+	fetchConfig();
 }
 
-fetchConfig();
+function fetchConfig() {
+	request('dump_config')
+		.then((resp) => JSON.parse(resp))
+		.then(setConfig)
+		.catch(e => console.log(e));
 
-document.getElementsByTagName('form')[0].addEventListener('submit', e => {
-	setTimeout(fetchConfig, 2000);
+	function setConfig(c) {
+		for (let key in c) {
+			let element = document.getElementById(key);
+			if (element) {
+				element.value = at.decodeURL(c[key]);
+			}
+		}
+	}
+}
+
+authForm.addEventListener('submit', (e) => {
+	e.preventDefault();
+	const auth = authForm.auth.value;
+	request(`auth = ${auth}`).then(() => authenticate(auth), alert);
+});
+
+configForm.addEventListener('submit', (e) => {
+	e.preventDefault();
+	request(formToMessage(configForm))
+		.then(alert, alert);
 });

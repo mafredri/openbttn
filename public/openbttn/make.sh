@@ -39,7 +39,7 @@ path=($SCRIPT/node_modules/.bin $path)
 
 		name=$(head -n1 $html.c)
 		name=${(j..)${(Cs._.)${${name#unsigned char }%\[*}}}
-		name="uint8_t g_Data${name}[] = {"
+		name="const uint8_t g_Data${name}[] = {"
 		{ print $name; tail -n +2 $html.c } >> data.c
 
 		size=$(grep "^unsigned int" $html.xxd)

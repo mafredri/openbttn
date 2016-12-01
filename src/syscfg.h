@@ -12,6 +12,9 @@
 #include <libopencmsis/core_cm3.h>
 
 #define CORE_CLOCK (uint32_t)32000000
+#ifndef SOCKD_PORT
+#define SOCKD_PORT 8774
+#endif
 
 extern volatile uint32_t g_SystemTick;
 extern volatile uint32_t g_SystemDelay;

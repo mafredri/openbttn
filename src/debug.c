@@ -56,3 +56,17 @@ static void usartSetup(void) {
 
   usart_enable(DEBUG_USART);
 }
+
+void cm3_assert_failed(void) {
+  printf("assert failed!\n");
+  while (true)
+    ;
+}
+
+void cm3_assert_failed_verbose(const char *file, int line, const char *func,
+                               const char *assert_expr) {
+  printf("assert failed in \"%s:%d\", function \"%s\" evaluating \"%s\"\n",
+         file, line, func, assert_expr);
+  while (true)
+    ;
+}
