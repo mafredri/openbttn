@@ -28,7 +28,7 @@ const at = {
 		}
 
 		// Maximum URL length, as defined in firmware.
-		if (newURL.length > 120) {
+		if (newURL.length > 200) {
 			throw new Error('URL too long: ' + url);
 		}
 

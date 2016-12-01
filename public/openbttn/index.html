@@ -8,54 +8,44 @@
 
 <body>
 	<h1>OpenBttn</h1>
-	<form>
+	<form id="auth-form">
 		<table>
 			<tr>
-				<td>Authentication:</td>
-				<td><input id="auth" type="password" size="25"></td>
-			</tr>
-			<tr>
-				<td>Button URL:</td>
-				<td><input id="url1" type="url" value="http://" size="25"></td>
-			</tr>
-			<tr>
-				<td>Long press URL:</td>
-				<td><input id="url2" type="url" value="http://" size="25"></td>
-			</tr>
-			<tr>
-				<td colspan="2">
-					<input id="apply" type="submit" value="Apply">
-					<input id="commit" type="submit" value="Save">
-				</td>
-			</tr>
-		</table>
-	</form>
-	<ul>
-		<li>Apply - Temporarily applies configuration to memory</li>
-		<li>Save - Permanently saves configuration to EEPROM</li>
-	</ul>
-	<form>
-		<table>
-			<tr>
-				<td>Authentication:</td>
+				<td>Authenticate:</td>
 				<td><input id="auth" type="password" size="25"></td>
 			</tr>
 			<tr>
 				<td colspan="2">
-					Send AT command(s) to Wi-Fi module:<br>
-					<textarea id="at_cmd" rows="5" cols="40"></textarea>
+					<input type="submit" value="Submit">
 				</td>
-			</tr>
-			<tr>
-				<td colspan="2"><input type="submit" value="Send"></td>
 			</tr>
 		</table>
 	</form>
+	<div id="conf" class="hidden">
+		<form id="conf-form">
+			<table>
+				<tr>
+					<td>Button URL:</td>
+					<td><input id="url1" type="url" value="http://" size="25"></td>
+				</tr>
+				<tr>
+					<td>Long press URL:</td>
+					<td><input id="url2" type="url" value="http://" size="25"></td>
+				</tr>
+				<tr>
+					<td colspan="2">
+						<input id="save" type="submit" value="Save">
+					</td>
+				</tr>
+			</table>
+		</form>
+	</div>
+	<hr>
 	<p>
 		<a href="/config.shtml">Config</a> <a href="/status.shtml">Status</a> <a href="/peers.shtml">Peers</a>
 	</p>
-	<script src="./cind.js"></script>
 	<script src="./at.js"></script>
+	<script src="./request.js"></script>
 	<script src="./form.js"></script>
 	<script src="./index.js"></script>
 </body>

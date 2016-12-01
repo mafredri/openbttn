@@ -9,12 +9,11 @@
 
 <body>
 	<h1>OpenBttn: First Config</h1>
-	<div id="fw">
+	<div id="fw" class="hidden">
 		<h2>Firmware Upgrade (SPWF01SA)</h2>
 		<form id="fw-form">
 			<p>
-				<strong>Current firmware:</strong> <span id="fw-ver"></span><br>
-				It is highly recommended that you upgrade the SPWF01SA firmware. The latest firmware can be found <a href="https://goo.gl/f9RmrE">here</a> (requires login).
+				<strong>Current firmware:</strong> <span id="fw-ver"></span><br> It is highly recommended that you upgrade the SPWF01SA firmware. The latest firmware can be found <a href="https://goo.gl/f9RmrE">here</a> (requires login).
 			</p>
 			<table>
 				<tr>
@@ -31,7 +30,7 @@
 
 	<div id="conf">
 		<h2>System configuration</h2>
-		<form>
+		<form id="conf-form">
 			<table>
 				<tr>
 					<td>Wireless network:</td>
@@ -39,7 +38,7 @@
 				</tr>
 				<tr>
 					<td>Password:</td>
-					<td><input type="password" id="password" size="25"></td>
+					<td><input type="password" id="wpa_psk" size="25"></td>
 				</tr>
 				<tr>
 					<td>Authentication:</td>
@@ -59,7 +58,7 @@
 							<option value="1" selected>N</option>
 						</select>
 					</td>
-				</td>
+				</tr>
 				<tr>
 					<td>DHCP:</td>
 					<td>
@@ -87,18 +86,19 @@
 				</tr>
 				<tr>
 					<td>Config password:</td>
-					<td><input type="password" id="user_desc" size="25" title="The config password is used when configuring the bttn in normal operation."></td>
+					<td><input type="password" id="password" size="25" title="The config password is used when configuring the bttn in normal operation."></td>
 				</tr>
 				<tr>
 					<td></td>
-					<td><input type="submit" id="commit" value="Save"></td>
+					<td><input type="submit" id="save" value="Save"></td>
 				</tr>
 			</table>
 		</form>
 	</div>
-	<script src="./cind.js"></script>
 	<script src="./at.js"></script>
+	<script src="./request.js"></script>
 	<script src="./form.js"></script>
 	<script src="./firstset.js"></script>
 </body>
+
 </html>
