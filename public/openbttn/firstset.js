@@ -24,7 +24,6 @@ firmwareForm.addEventListener('submit', function (e) {
 	document.querySelector('#conf').classList.add('hidden');
 
 	let i = FIRMWARE_TIMEOUT / 1000;
-	loading();
 	let iv = setInterval(loading, 1000);
 
 	request(formToMessage(firmwareForm), FIRMWARE_TIMEOUT)
@@ -36,6 +35,8 @@ firmwareForm.addEventListener('submit', function (e) {
 			clearInterval(iv);
 			firmwareForm.innerHTML = `${err}, please reload this page and try again...`;
 		});
+
+	loading();
 
 	function loading() {
 		firmwareForm.innerHTML = 'Downloading firmware...<br><br>Please wait: ' + i--;
