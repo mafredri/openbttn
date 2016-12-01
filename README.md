@@ -6,7 +6,33 @@ This firmware is in no way associated with The Button Corporation Ltd.
 
 Installing this firmware will most likely void your warranty.
 
+
+## Features
+
+* Allow spaces in Wi-Fi SSIDs (the original firmware doesn't).
+    * Probably other special characters as well.
+* Single and long press
+    * Super fast response times in a local setting
+* Live configuration (from Web-UI hosted on bt.tn)
+* OTA update of the SPWF01SA Wi-Fi module
+* Custom led flashing by [POST request](https://github.com/mafredri/openbttn/commit/d2a22cb6291fbe04f809ac2fbe771ca0c1953c66)
+* Password authentication for bt.tn configuration
+
 ## Gettings started
+
+### First steps
+
+1. Download the latest [release](https://github.com/mafredri/openbttn/releases) or build the project yourself
+2. Install the firmware
+    * Optionally, backup the original firmware
+3. Configure bttn in recovery mode
+    1. Boot bttn while holding the button for 4 seconds to enter recovery mode
+    2. Connect to the 'OpenBttn' Wi-Fi network
+    3. Navigate to `http://192.168.1.1/`
+    4. Configure your Wi-Fi settings
+4. Configure the button press URLs
+    1. Navigate to `http://[bttn_IP_on_your_network]/`
+5. Enjoy your OpenBttn!
 
 ### Building
 
@@ -43,26 +69,13 @@ This firmware can be installed in two ways, either via DFU mode or via the JTAG 
     * It should now show up in the DFU list (`dfu-util --list`)
 4. `cd openbttn/src && make download`
 
-`make download` is the same as manually issuing `dfu-util -d 0483:df11 -s 0x08000000 -a 0 -D main.bin` which requires the `main.bin` to be built first. This downloads the firmware to the bt.tn and overwrites the original firmware.
-
-## Features
-
-* Allow spaces in Wi-Fi SSIDs (the original firmware doesn't).
-    * Probably other special characters as well.
-* Single and long press
-    * Super fast response times in a local setting
-* Live configuration (from Web-UI hosted on bt.tn)
-* OTA update of the SPWF01SA Wi-Fi module
-* Custom led flashing by POST request
-    * This is a WIP and part of the `socket-refactor` branch (d2a22cb)
-* Password authentication for bt.tn configuration
+`make download` is the same as manually issuing `dfu-util --device 0483:df11 --dfuse-address 0x08000000 --alt 0 --download main.bin` which requires the `main.bin` to be built first. This downloads the firmware to the bt.tn and overwrites the original firmware.
 
 ## Current status
 
 ### TODO
 
-* Complete the `socket-refactor` branch
-* Improve Web-UI
+* Improve documentation
 
 ### Nice to have
 
