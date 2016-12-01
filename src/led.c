@@ -212,22 +212,22 @@ void led_TickHandlerGreenCircleFill(uint32_t ticks) {
 void led_TickHandlerGreenLoading(uint32_t ticks) {
   switch ((ticks % 6)) {
   case 0:
-    led_Set(0x01 << 8);
+    led_Set((0x01 << 0) | (0x01 << 8) | (0x01 << 16));
     break;
   case 1:
-    led_Set(0x02 << 8);
+    led_Set((0x02 << 0) | (0x02 << 8) | (0x02 << 16));
     break;
   case 2:
-    led_Set(0x04 << 8);
+    led_Set((0x04 << 0) | (0x04 << 8) | (0x04 << 16));
     break;
   case 3:
-    led_Set(0x08 << 8);
+    led_Set((0x08 << 0) | (0x08 << 8) | (0x08 << 16));
     break;
   case 4:
-    led_Set(0x10 << 8);
+    led_Set((0x10 << 0) | (0x10 << 8) | (0x10 << 16));
     break;
   case 5:
-    led_Set(0x20 << 8);
+    led_Set((0x20 << 0) | (0x20 << 8) | (0x20 << 16));
     break;
   }
 }

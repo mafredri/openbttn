@@ -171,11 +171,13 @@ int main(void) {
       }
 
       // Speedy loading indicator (rotating light).
-      led_TickConfigure(50, g_SystemTick, &led_TickHandlerGreenLoading);
+      led_SetBrightness(69, 119, 1);
+      led_TickConfigure(70, g_SystemTick, &led_TickHandlerGreenLoading);
       led_TickEnable();
 
       httpStatus = wifi_HttpGet(url);
       led_TickDisable();
+      led_SetBrightness(119, 119, 119);
 
       if (httpStatus >= 400) {
         led_Set(0x0000ff);
