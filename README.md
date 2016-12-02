@@ -6,7 +6,6 @@ This firmware is in no way associated with The Button Corporation Ltd.
 
 Installing this firmware will most likely void your warranty.
 
-
 ## Features
 
 * Allow spaces in Wi-Fi SSIDs (the original firmware doesn't).
@@ -17,6 +16,18 @@ Installing this firmware will most likely void your warranty.
 * OTA update of the SPWF01SA Wi-Fi module
 * Custom led flashing by [POST request](https://github.com/mafredri/openbttn/commit/d2a22cb6291fbe04f809ac2fbe771ca0c1953c66)
 * Password authentication for bt.tn configuration
+
+## Supported models
+
+The following bt.tn models have been tested and confirmed working:
+
+* bttn Wi-Fi
+
+### Untested models
+
+* bttn Mobile Data
+* bttn Mini Wi-Fi
+* bttn Mini Mobile Data
 
 ## Gettings started
 
