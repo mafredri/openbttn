@@ -532,6 +532,14 @@ bool wifi_StopSockd(void) {
                      WIFI_STATE_SOCKD_SAFE_CLIENT_ACTIVE |
                      WIFI_STATE_SOCKD_PENDING_DATA | WIFI_STATE_DATA_MODE);
     return true;
+  } else if (strstr(wifi->at->buff, "Socket Server not running")) {
+    // Received "ERROR: Socket Server not running" indicating that our internal
+    // state for the socket server is incorrect.
+    printf("Socket server not running, resetting state...\n");
+    wifi->state &= ~(WIFI_STATE_SOCKD_STARTED | WIFI_STATE_SOCKD_CLIENT_ACTIVE |
+                     WIFI_STATE_SOCKD_SAFE_CLIENT_ACTIVE |
+                     WIFI_STATE_SOCKD_PENDING_DATA | WIFI_STATE_DATA_MODE);
+    return true;
   }
   return false;
 }
