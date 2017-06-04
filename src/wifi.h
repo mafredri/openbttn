@@ -64,7 +64,7 @@
 
 #define HTTP_HEADER_LENGTH 180
 #define HTTP_HEADER_ENCODING_LENGTH                                            \
-  (18 + 8) // Longest encodings are "compress" and "identity" (8 chars).
+  (18 + 8 + 2) // Longest encodings are "compress" and "identity" (8 chars).
 
 typedef uint16_t WifiState;
 
