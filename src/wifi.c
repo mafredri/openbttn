@@ -277,12 +277,12 @@ uint16_t wifi_HttpGet(char *url) {
   }
 }
 
-const char httpHeaderTpl[] = "HTTP/1.0 %d %s\n"
-                             "Server: OpenBttn\n"
-                             "Access-Control-Allow-Origin: *\n"
-                             "Content-Type: %s\n"
-                             "%s" // "Content-Encoding: %s\n"
-                             "Content-Length: %d\n\n";
+const char httpHeaderTpl[] = "HTTP/1.0 %d %s\r\n"
+                             "Server: OpenBttn\r\n"
+                             "Access-Control-Allow-Origin: *\r\n"
+                             "Content-Type: %s\r\n"
+                             "%s" // "Content-Encoding: %s\r\n"
+                             "Content-Length: %d\r\n\r\n";
 
 int wifi_CreateHttpHeader(char *dest, int len, int status,
                           const char *statusText, const char *contentType,
@@ -290,7 +290,7 @@ int wifi_CreateHttpHeader(char *dest, int len, int status,
   char contentEncoding[HTTP_HEADER_ENCODING_LENGTH + 1] = {0};
   if (contentEnc) {
     int s = snprintf(contentEncoding, HTTP_HEADER_ENCODING_LENGTH,
-                     "Content-Encoding: %s\n", contentEnc);
+                     "Content-Encoding: %s\r\n", contentEnc);
     if (s < 0) {
       return s;
     }
