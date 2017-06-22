@@ -84,7 +84,7 @@ Only DFU mode is covered here.
 ### Boot bttn in DFU mode
 
 1. Open the bttn by removing the three T10 torx screws ![torx](resources/torx.png "Torx head") at the bottom.
-2. Connect the [Boot pins](./resources/bttn-boot-pins.png) on the board (note: only the Boot pins, not the FWSel ones). An easy way to do this is with [a paper clip and a bit of electrical tape](./resources/bttn-boot-pins-shorting.png) twice-folded so as to insulate the paper clip so that it does not touch the FWSel pins or any other contacts on the board.
+2. Connect the [Boot pins](./resources/bttn-boot-pins.png) on the board (note: only the Boot pins, not the FWSel ones). An easy way to do this is with [a paper clip and a bit of electrical tape](./resources/bttn-boot-pins-shorting.jpg) twice-folded so as to insulate the paper clip so that it does not touch the FWSel pins or any other contacts on the board.
 3. Connect the bttn via USB to computer
 4. Run via terminal:
 
@@ -189,7 +189,7 @@ You may reconfigure your bttn as often as desired.
 
 ### Built-in socket server
 
-There are several functions available via the socket server. Note that URLs must be encoded to AT format before being passed to the socket server. Refer to [at.js](public/at.js) for more information.
+There are several functions available via the socket server. Note that URLs must be encoded to AT format before being passed to the socket server. Refer to [at.js](public/openbttn/at.js) for more information.
 
 * `dump_config` - return current configuration
 * `blink_leds` - change LED colors in a sequence
@@ -217,10 +217,10 @@ Example output (JSON):
 > {"url1":"10.1.5.13,/shortPress,4040","url2":"10.1.5.13,/longPress,4040"}
 > ```
 
-Turn on the LEDs (white) for 400ms then then them off:
+Turn on the LEDs (white) for 400ms and then them off:
 
 ```
-$ curl -w "\n" --data $'auth = PASSWORD\r\nblink_leds = ffffff;400;0;400' $BTTNSOCK
+$ curl -w "\n" --data $'auth = PASSWORD\r\nblink_leds = ffffff;400;0;0' $BTTNSOCK
 ```
 
 Example output (plaintext):
@@ -234,11 +234,11 @@ Example output (plaintext):
 ### TODO
 
 * Document how LEDs can be specified or individually addressed in `blink_leds` command
-* Document OTA update of Wi-Fi module
-  - Firmware link no longer works
-  - Is this process safe or can it brick the device?
-  - Is it essential? 
-  - What does it improve?
+* Document update of Wi-Fi module
+  - Ships with 3.4, but 3.5 is available and brings many improvements
+  - Updating Wi-Fi module is very safe
+  - Get latest module firmware [here](https://my.st.com/content/my_st_com/en/products/embedded-software/wireless-connectivity-software/stsw-wifi001.html) (requires signing up for a free account).
+
  
 ### Nice to have
 
