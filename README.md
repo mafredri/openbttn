@@ -235,7 +235,8 @@ Example output (plaintext):
 
 * Document how LEDs can be specified or individually addressed in `blink_leds` command
 * Document update of Wi-Fi module
-  - Ships with 3.4, but 3.5 is available and brings many improvements
+  - Might ship with an old firmware version, depends on when the bttn was built
+  - Version 3.5 is available and brings many improvements over older versions
   - Updating Wi-Fi module is very safe
   - Get latest module firmware [here](https://my.st.com/content/my_st_com/en/products/embedded-software/wireless-connectivity-software/stsw-wifi001.html) (requires signing up for a free account).
 
