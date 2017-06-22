@@ -7,7 +7,7 @@ This firmware is in no way associated with The Button Corporation Ltd.
 Installing this firmware will most likely void your warranty.
 
 > Herein, **bt.tn** refers to The Button Corporation Ltd., and **bttn** refers to a consumer device manufactured by said company.
- 
+
 ## Features
 
 Similar to stock firmware, OpenBttn supports:
@@ -201,25 +201,25 @@ There are several functions available via the socket server. Note that URLs must
 
 Set a shell variable for the socket server's URL:
 
-```
+```console
 $ export BTTNSOCK="http://[bttn_IP_on_your_network]:8774/socket"
 ```
 
 Read configuration for button press actions:
 
-```
+```console
 $ curl -w "\n" --data $'auth = PASSWORD\r\ndump_config' $BTTNSOCK
 ```
 
 Example output (JSON):
 
-> ```
+> ```json
 > {"url1":"10.1.5.13,/shortPress,4040","url2":"10.1.5.13,/longPress,4040"}
 > ```
 
 Turn on the LEDs (white) for 400ms and then them off:
 
-```
+```console
 $ curl -w "\n" --data $'auth = PASSWORD\r\nblink_leds = ffffff;400;0;0' $BTTNSOCK
 ```
 
@@ -239,7 +239,6 @@ Example output (plaintext):
   - Updating Wi-Fi module is very safe
   - Get latest module firmware [here](https://my.st.com/content/my_st_com/en/products/embedded-software/wireless-connectivity-software/stsw-wifi001.html) (requires signing up for a free account).
 
- 
 ### Nice to have
 
 * OTA update of OpenBttn (we are already able to OTA update the Wi-Fi module, updating OpenBttn remotely would also be nice)
