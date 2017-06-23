@@ -283,23 +283,7 @@ Run the included web server (more on this in "Development server" above):
 $ cd public && go run ../cmd/openbttn/main.go
 ```
 
-Boot bttn in recovery mode (like you did above), but this time get your IP address and use it to form the OTA update URL:
-
-```
-$ ifconfig | grep 192.
-```
-
-Example output:
-
-> ```
-> inet 192.168.1.2 netmask 0xffffff00 broadcast 192.168.1.255
-> ```
-
-Here our IP address is `192.168.1.2` so we'll use that to construct our OTA update URL:
-
-```
-http://192.168.1.2:8774/ota/SPWF01S-160129-c5bf5ce-RELEASE-main.ota
-```
+Boot bttn in recovery mode, as described in the section above, and join the `OpenBttn` Wi-Fi network.
 
 Next, open a web browser to [http://192.168.1.1](http://192.168.1.1) and verify that the update URL shown matches what you expect, and that you can reach that URL yourself (doing so should trigger a file download).
 
