@@ -53,7 +53,7 @@ The following bttn models have been tested and confirmed working:
 
 ### Get the firmware
 
-You may compile the firmware yourself or use an pre-compiled firmware image.
+You may compile the firmware yourself or use a pre-compiled firmware image.
 
 #### Download a pre-compiled firmware
 
