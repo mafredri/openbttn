@@ -230,6 +230,30 @@ Example output (plaintext):
 > Success!
 > ```
 
+### Development server
+
+OpenBttn contains a development server written in Go, it can be used for developing the web UI locally or for serving the OTA update for the SPWF01SA module.
+
+Installation via macOS:
+
+```
+$ brew install go
+```
+
+Usage:
+
+```
+go run cmd/openbttn/main.go -ip 192.168.0.123 -ota ./public/ota -public ./public/openbttn
+```
+
+`-ip` assumes button is at IP 192.168.0.123, used for redirecting some communication while developing the Web UI.
+
+`-ota` path to folder containing Wi-Fi module OTA image (more on this below)
+
+`-public` path to folder containing Web UI.
+
+The development server serves everything at `http://localhost:8774`.
+
 ### OTA update of Wi-Fi module firmware
 
 #### Overview
@@ -239,12 +263,6 @@ Depending on when your bttn was built, it may have shipped with an older Wi-Fi m
 As of this writing, version 3.5 is available and brings many improvements over older versions.
 
 #### Updating the Wi-Fi module
-
-A lightweight web server is included (written in Go) that will serve OTA Wi-Fi updates.
-
-```
-$ brew install go
-```
 
 Download the latest Wi-Fi module firmware from [here](https://my.st.com/content/my_st_com/en/products/embedded-software/wireless-connectivity-software/stsw-wifi001.html) (requires signing up for a free account).
 
@@ -259,7 +277,7 @@ Move the firmware into the `ota` folder:
 $ mv ~/Downloads/STSW-WIFI001/Rel.\ 3.5/OTA/SPWF01S-160129-c5bf5ce-RELEASE-main.ota public/ota/
 ```
 
-Run the included web server:
+Run the included web server (more on this in "Development server" above):
 
 ```
 $ cd public && go run ../cmd/openbttn/main.go
