@@ -38,7 +38,7 @@ The following bttn models have been tested and confirmed working:
 * bttn Mini Wi-Fi
 * bttn Mini Mobile Data
 
-## Gettings started
+## Getting started
 
 ### Overview
 
