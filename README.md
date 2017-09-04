@@ -1,4 +1,4 @@
-# OpenBttn
+# OpenBttn 
 
 OpenBttn is a custom open source firmware for [bt.tn](https://bt.tn) buttons. This firmware does not communicate with the official bt.tn servers and contains some features not available in the original firmware. It's written using the [libopencm3](https://github.com/libopencm3/libopencm3) firmware library for ARM Cortex-M3 microcontrollers.
 
@@ -38,13 +38,14 @@ The following bttn models have been tested and confirmed working:
 * bttn Mini Wi-Fi
 * bttn Mini Mobile Data
 
-## Gettings started
+## Getting started
 
 ### Overview
 
 1. Download the latest release or build the project yourself
 2. (Optionally) backup the existing firmware
 3. Install new firmware
+4. (Optionally) update the Wi-Fi module firmware
 4. Boot bttn in recovery mode to input your Wi-Fi settings
 5. Reboot your bttn
 5. Live configure the button press URLs using Web-UI
@@ -52,7 +53,7 @@ The following bttn models have been tested and confirmed working:
 
 ### Get the firmware
 
-You may compile the firmware yourself or use an pre-compiled firmware image.
+You may compile the firmware yourself or use a pre-compiled firmware image.
 
 #### Download a pre-compiled firmware
 
@@ -229,16 +230,70 @@ Example output (plaintext):
 > Success!
 > ```
 
+### Development server
+
+OpenBttn contains a development server written in Go, it can be used for developing the web UI locally or for serving the OTA update for the SPWF01SA module.
+
+Installation via macOS:
+
+```
+$ brew install go
+```
+
+Usage:
+
+```
+go run cmd/openbttn/main.go -ip 192.168.0.123 -ota ./public/ota -public ./public/openbttn
+```
+
+`-ip` assumes button is at IP 192.168.0.123, used for redirecting some communication while developing the Web UI.
+
+`-ota` path to folder containing Wi-Fi module OTA image (more on this below)
+
+`-public` path to folder containing Web UI.
+
+The development server serves everything at `http://localhost:8774`.
+
+### OTA update of Wi-Fi module firmware
+
+#### Overview
+
+Depending on when your bttn was built, it may have shipped with an older Wi-Fi module firmware. It's recommended to upgrade this firmware, and the process is stable and safe, but as with all things, your mileage may vary.
+
+As of this writing, version 3.5 is available and brings many improvements over older versions.
+
+#### Updating the Wi-Fi module
+
+Download the latest Wi-Fi module firmware from [here](https://my.st.com/content/my_st_com/en/products/embedded-software/wireless-connectivity-software/stsw-wifi001.html) (requires signing up for a free account).
+
+Unzip it and locate the module firmware version you wish to use.
+
+For our example, we've chosen:
+> SPWF01S-160129-c5bf5ce-RELEASE-main.ota
+
+Move the firmware into the `ota` folder:
+
+```
+$ mv ~/Downloads/STSW-WIFI001/Rel.\ 3.5/OTA/SPWF01S-160129-c5bf5ce-RELEASE-main.ota public/ota/
+```
+
+Run the included web server (more on this in "Development server" above):
+
+```
+$ cd public && go run ../cmd/openbttn/main.go
+```
+
+Boot bttn in recovery mode, as described in the section above, and join the `OpenBttn` Wi-Fi network.
+
+Next, open a web browser to [http://192.168.1.1](http://192.168.1.1) and verify that the update URL shown matches what you expect, and that you can reach that URL yourself (doing so should trigger a file download).
+
+If it's working as expected, you may update the Wi-Fi module firmware. After it has succeeded, you may need to reconnect to the *OpenBttn* Wi-Fi access point to proceed with inputting your network settings.
+
 ## Current status
 
 ### TODO
 
 * Document how LEDs can be specified or individually addressed in `blink_leds` command
-* Document update of Wi-Fi module
-  - Might ship with an old firmware version, depends on when the bttn was built
-  - Version 3.5 is available and brings many improvements over older versions
-  - Updating Wi-Fi module is very safe
-  - Get latest module firmware [here](https://my.st.com/content/my_st_com/en/products/embedded-software/wireless-connectivity-software/stsw-wifi001.html) (requires signing up for a free account).
 
 ### Nice to have
 
