@@ -1,4 +1,4 @@
-# OpenBttn 
+# OpenBttn
 
 OpenBttn is a custom open source firmware for [bt.tn](https://bt.tn) buttons. This firmware does not communicate with the official bt.tn servers and contains some features not available in the original firmware. It's written using the [libopencm3](https://github.com/libopencm3/libopencm3) firmware library for ARM Cortex-M3 microcontrollers.
 
@@ -26,13 +26,13 @@ Plus:
 
 ## Hardware
 
-#### Supported models
+### Supported models
 
 The following bttn models have been tested and confirmed working:
 
 * bttn Wi-Fi
 
-#### Untested models
+### Untested models
 
 * bttn Mobile Data
 * bttn Mini Wi-Fi
@@ -63,17 +63,17 @@ Grab the newest [release](https://github.com/mafredri/openbttn/releases) and unz
 
 Install the [GNU ARM Embedded Toolchain](https://launchpad.net/gcc-arm-embedded/+download):
 
-```shell
-brew cask install gcc-arm-embedded
+```console
+$ brew cask install gcc-arm-embedded
 ```
 
 Check out and build the project:
 
-```shell
-git clone https://github.com/mafredri/openbttn && cd openbttn
-git submodule update --init
-make  # builds src/main.elf
-cd src && make bin # builds src/main.bin
+```console
+$ git clone https://github.com/mafredri/openbttn && cd openbttn
+$ git submodule update --init
+$ make                # builds src/main.elf
+$ cd src && make bin  # builds src/main.bin
 ```
 
 ### Firmware flashing methods
@@ -89,8 +89,8 @@ Only DFU mode is covered here.
 3. Connect the bttn via USB to computer
 4. Run via terminal:
 
-```
-dfu-util --list
+```console
+$ dfu-util --list
 ```
 
 You should see output like the following. Note that the device ID (product and vendor) will likely be the same if you're using a Wi-Fi bttn (`0483:df11`). This may vary with other bttn models (untested).
@@ -110,8 +110,8 @@ If your output looks like the above, you are ready to proceed.
 
 To back-up the firmware from the device, we will tell `dfu-util` to *upload* it to us. Use the device ID from the output of running `dfu-util --list` above.
 
-```
-dfu-util --device 0483:df11 --dfuse-address 0x08000000 --alt 0 --upload backup.bin
+```console
+$ dfu-util --device 0483:df11 --dfuse-address 0x08000000 --alt 0 --upload backup.bin
 ```
 
 This will upload the firmware from the bttn to your computer and save it as `backup.bin`. You may later use this backup to restore your bttn to its original state.
@@ -122,8 +122,8 @@ This will upload the firmware from the bttn to your computer and save it as `bac
 
 If you compiled the firmware yourself (above), you can now flash it to your Wi-Fi bttn:
 
-```
-cd openbttn/src && make download
+```console
+$ cd openbttn/src && make download
 ```
 
 `make download` has the same effect as manually issuing a `dfu-util` *download* command and requires a Wi-Fi bttn to be connected and the image built from source available as `src/main.bin`.
@@ -136,8 +136,8 @@ In the example below, a release image named `openbttn-v1.0.1.bin` has been downl
 
 Flash the bttn with the image:
 
-```
-dfu-util --device 0483:df11 --dfuse-address 0x08000000 --alt 0 --download openbttn-v1.0.1.bin
+```console
+$ dfu-util --device 0483:df11 --dfuse-address 0x08000000 --alt 0 --download openbttn-v1.0.1.bin
 ```
 
 You will see output like the following as the original firmware is overwritten:
@@ -236,14 +236,14 @@ OpenBttn contains a development server written in Go, it can be used for develop
 
 Installation via macOS:
 
-```
+```console
 $ brew install go
 ```
 
 Usage:
 
-```
-go run cmd/openbttn/main.go -ip 192.168.0.123 -ota ./public/ota -public ./public/openbttn
+```console
+$ go run cmd/openbttn/main.go -ip 192.168.0.123 -ota ./public/ota -public ./public/openbttn
 ```
 
 `-ip` assumes button is at IP 192.168.0.123, used for redirecting some communication while developing the Web UI.
@@ -273,21 +273,21 @@ For our example, we've chosen:
 
 Move the firmware into the `ota` folder:
 
-```
+```console
 $ mv ~/Downloads/STSW-WIFI001/Rel.\ 3.5/OTA/SPWF01S-160129-c5bf5ce-RELEASE-main.ota public/ota/
 ```
 
-Run the included web server (more on this in "Development server" above):
+Run the included web server (more on this in [Development server](#development-server)):
 
-```
+```console
 $ cd public && go run ../cmd/openbttn/main.go
 ```
 
-Boot bttn in recovery mode, as described in the section above, and join the `OpenBttn` Wi-Fi network.
+[Boot bttn in recovery mode](#boot-bttn-in-recovery-mode) and join the `OpenBttn` Wi-Fi network.
 
-Next, open a web browser to [http://192.168.1.1](http://192.168.1.1) and verify that the update URL shown matches what you expect, and that you can reach that URL yourself (doing so should trigger a file download).
+Next, navigate to [http://192.168.1.1](http://192.168.1.1) and verify that the update URL shown matches what you expect, and that you can reach that URL yourself (doing so should trigger a file download).
 
-If it's working as expected, you may update the Wi-Fi module firmware. After it has succeeded, you may need to reconnect to the *OpenBttn* Wi-Fi access point to proceed with inputting your network settings.
+If it's working as expected, you may update the Wi-Fi module firmware. After the update has succeeded, you may need to reconnect to the *OpenBttn* Wi-Fi access point to proceed with (re)configuring the Wi-Fi settings.
 
 ## Current status
 
