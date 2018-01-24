@@ -61,7 +61,7 @@ function getFirmwareVersion(data) {
 function checkFirmwareVersion({ date, commit }) {
 	if (date < 141106) {
 		document.getElementById('fw-form').innerHTML = '<p class="warn">Firmware is too old for OTA update.</p>';
-	} else if (date < 160129) {
+	} else if (date < 170111) {
 		document.getElementById('fw').classList.remove('hidden');
 	}
 	document.getElementById('fw-ver').textContent = date + '-' + commit;
