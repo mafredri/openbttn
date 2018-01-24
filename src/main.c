@@ -512,7 +512,7 @@ static void clockSetup(void) {
       .ppre1 = RCC_CFGR_PPRE1_HCLK_NODIV,
       .ppre2 = RCC_CFGR_PPRE2_HCLK_NODIV,
       .voltage_scale = PWR_SCALE1,
-      .flash_config = FLASH_ACR_LATENCY_1WS,
+      .flash_waitstates = 1,
       .ahb_frequency = CORE_CLOCK,
       .apb1_frequency = CORE_CLOCK,
       .apb2_frequency = CORE_CLOCK,
