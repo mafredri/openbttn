@@ -260,7 +260,7 @@ The development server serves everything at `http://localhost:8774`.
 
 Depending on when your bttn was built, it may have shipped with an older Wi-Fi module firmware. It's recommended to upgrade this firmware, and the process is stable and safe, but as with all things, your mileage may vary.
 
-As of this writing, version 3.5 is available and brings many improvements over older versions.
+As of this writing, version 3.5.3 is available and brings many improvements over older versions.
 
 #### Updating the Wi-Fi module
 
@@ -269,12 +269,12 @@ Download the latest Wi-Fi module firmware from [here](https://my.st.com/content/
 Unzip it and locate the module firmware version you wish to use.
 
 For our example, we've chosen:
-> SPWF01S-160129-c5bf5ce-RELEASE-main.ota
+> SPWF01S-170111-665d284-RELEASE-main.ota
 
 Move the firmware into the `ota` folder:
 
 ```console
-$ mv ~/Downloads/STSW-WIFI001/Rel.\ 3.5/OTA/SPWF01S-160129-c5bf5ce-RELEASE-main.ota public/ota/
+$ mv ~/Downloads/STSW-WIFI001/Rel.\ 3.5.3/OTA/SPWF01S-170111-665d284-RELEASE-main.ota public/ota/
 ```
 
 Run the included web server (more on this in [Development server](#development-server)):
