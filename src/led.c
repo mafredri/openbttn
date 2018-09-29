@@ -51,7 +51,7 @@ static void ledPowerGpioConfigure(uint32_t rcc, uint32_t port, uint16_t pin) {
 static void powerPwmSetup(void) {
   rcc_periph_clock_enable(RCC_LED_TIMER);
 
-  timer_reset(LED_TIMER);
+  rcc_periph_reset_pulse(RST_TIM3);
   timer_set_mode(LED_TIMER, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
                  TIM_CR1_DIR_UP);
   // Prescaler: 32MHz / 8MHz - 1 = 3
