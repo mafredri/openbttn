@@ -1,0 +1,233 @@
+<cr><lf>+WIND:1:Poweron (141106-0950875-SPWF01S)<cr><lf>
+<cr><lf>+WIND:13:ST SPWF01SA1 IWM: Copyright (c) 2012-2014 STMicroelectronics, Inc.  All rights Reserved.<cr><lf>
+<cr><lf>+WIND:3:Watchdog Running<cr><lf>
+<cr><lf>+WIND:0:Console active<cr><lf>
+
+AT&F
+<cr><lf>OK<cr><lf>
+
+AT+S.SSIDTXT=MySSID
+<cr><lf>OK<cr><lf>
+
+AT+S.SCFG=wifi_wpa_psk_text,MyPASSWORD
+<cr><lf>OK<cr><lf>
+
+AT+S.SCFG=wifi_priv_mode,2
+<cr><lf>OK<cr><lf>
+
+AT+S.SCFG=wifi_mode,1
+<cr><lf>OK<cr><lf>
+
+AT+S.SCFG=ip_use_dhcp,1
+<cr><lf>OK<cr><lf>
+
+AT+S.SCFG=ip_use_decoder,2
+<cr><lf>ERROR: Unrecognized key<cr><lf>
+
+AT&W
+<cr><lf>OK<cr><lf>
+
+AT+CFUN=1
+<cr><lf>+WIND:2:Reset<cr><lf>
+<cr><lf>+WIND:1:Poweron (141106-0950875-SPWF01S)<cr><lf>
+<cr><lf>+WIND:13:ST SPWF01SA1 IWM: Copyright (c) 2012-2014 STMicroelectronics, Inc.  All rights Reserved.<cr><lf>
+<cr><lf>+WIND:3:Watchdog Running<cr><lf>
+<cr><lf>+WIND:46:WPA: Crunching PSK...<cr><lf>
+<cr><lf>+WIND:0:Console active<cr><lf>
+<cr><lf>+WIND:32:WiFi Hardware Started<cr><lf>
+<cr><lf>+WIND:21:WiFi Scanning<cr><lf>
+<cr><lf>+WIND:35:WiFi Scan Complete (0x0)<cr><lf>
+<cr><lf>+WIND:19:WiFi Join:00:00:00:00:00:00<cr><lf>
+<cr><lf>+WIND:25:WiFi Association with 'MySSID' successful<cr><lf>
+<cr><lf>+WIND:51:WPA Handshake Complete<cr><lf>
+<cr><lf>+WIND:24:WiFi Up:192.168.0.188<cr><lf>
+
+AT&V
+# Dumping All Configuration Keys:<cr><lf>
+#  nv_manuf = ST<cr><lf>
+#  nv_model = SPWF01SA1<cr><lf>
+#  nv_serial = 2914D12541<cr><lf>
+#  nv_wifi_macaddr = 00:80:E1:B4:00:00<cr><lf>
+#  blink_led = 0<cr><lf>
+#  wind_off_low = 0x00000000<cr><lf>
+#  wind_off_medium = 0x00000000<cr><lf>
+#  wind_off_high = 0x00000000<cr><lf>
+#  user_desc = anonymous<cr><lf>
+#  escape_seq = at+s.<cr><lf>
+#  localecho1 = 0<cr><lf>
+#  console1_speed = 115200<cr><lf>
+#  console1_hwfc = 0<cr><lf>
+#  console1_enabled = 1<cr><lf>
+#  sleep_enabled = 0<cr><lf>
+#  standby_enabled = 0<cr><lf>
+#  standby_time = 10<cr><lf>
+#  wifi_tx_msdu_lifetime = 0<cr><lf>
+#  wifi_rx_msdu_lifetime = 0<cr><lf>
+#  wifi_operational_mode = 0x00000011<cr><lf>
+#  wifi_beacon_wakeup = 1<cr><lf>
+#  wifi_beacon_interval = 100<cr><lf>
+#  wifi_listen_interval = 0<cr><lf>
+#  wifi_rts_threshold = 3000<cr><lf>
+#  wifi_ssid = 00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00<cr><lf>
+#  wifi_ssid_len = 14<cr><lf>
+#  wifi_channelnum = 6<cr><lf>
+#  wifi_opr_rate_mask = 0x00003FCF<cr><lf>
+#  wifi_bas_rate_mask = 0x0000000F<cr><lf>
+#  wifi_mode = 1<cr><lf>
+#  wifi_auth_type = 0<cr><lf>
+#  wifi_atim_window = 0<cr><lf>
+#  wifi_powersave = 0<cr><lf>
+#  wifi_tx_power = 18<cr><lf>
+#  wifi_rssi_thresh = 0<cr><lf>
+#  wifi_rssi_hyst = 0<cr><lf>
+#  wifi_ap_idle_timeout = 120<cr><lf>
+#  wifi_beacon_loss_thresh = 10<cr><lf>
+#  wifi_priv_mode = 2<cr><lf>
+#  wifi_wep_keys[0] = 00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00<cr><lf>
+#  wifi_wep_keys[1] = 00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00<cr><lf>
+#  wifi_wep_keys[2] = 00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00<cr><lf>
+#  wifi_wep_keys[3] = 00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00<cr><lf>
+#  wifi_wep_key_lens = 00:00:00:00<cr><lf>
+#  wifi_wep_default_key = 0<cr><lf>
+#  wifi_wpa_psk_raw = 00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00<cr><lf>
+#  wifi_wpa_psk_text = MyPASSWORD<cr><lf>
+#  ip_use_dhcp = 1<cr><lf>
+#  ip_use_httpd = 1<cr><lf>
+#  ip_mtu = 1500<cr><lf>
+#  ip_hostname = iwm-B4-00-00<cr><lf>
+#  ip_apdomainname = captiveportal.net<cr><lf>
+#  ip_ipaddr = 192.168.0.50<cr><lf>
+#  ip_netmask = 255.255.255.0<cr><lf>
+#  ip_gw = 192.168.0.1<cr><lf>
+#  ip_dns = 192.168.0.1<cr><lf>
+#  ip_http_get_recv_timeout = 3000<cr><lf>
+#  ip_dhcp_timeout = 20<cr><lf>
+#  ip_sockd_timeout = 250<cr><lf>
+<cr><lf>OK<cr><lf>
+
+AT+S.SSIDTXT
+SSID = 'MySSID'<cr><lf>
+<cr><lf>OK<cr><lf>
+
+AT+S.STS
+# Status & Statistics:<cr><lf>
+#  version = 141106-0950875-SPWF01S <cr><lf>
+#  reset_reason = 2<cr><lf>
+#  conf_flag = 5<cr><lf>
+#  system_uptime = 13<cr><lf>
+#  system_sleeptime = 0<cr><lf>
+#  gpio_enable = 0<cr><lf>
+#  captiveportal = 0<cr><lf>
+#  wifi_state = 10<cr><lf>
+#  wifi_bssid = 00:00:00:00:00:00<cr><lf>
+#  wifi_aid = 2<cr><lf>
+#  wifi_channelnum = 11<cr><lf>
+#  wifi_sup_rate_mask = 0x003FFFCF<cr><lf>
+#  wifi_bas_rate_mask = 0x0000000F<cr><lf>
+#  wifi_chan_activity2 = 0x00003FFF<cr><lf>
+#  wifi_max_tx_power = 18<cr><lf>
+#  wifi_reg_country = FI <cr><lf>
+#  wifi_dtim_period = 2<cr><lf>
+#  wifi_sleeping = 1<cr><lf>
+#  wifi_num_assoc = 0<cr><lf>
+#  ip_ipaddr = 192.168.0.188<cr><lf>
+#  ip_netmask = 255.255.255.0<cr><lf>
+#  ip_gw = 192.168.0.1<cr><lf>
+#  ip_dns = 192.168.0.1<cr><lf>
+#  ip_sock_open = 0<cr><lf>
+#  ip_sockd_port = 0<cr><lf>
+#  free_heap = 21000<cr><lf>
+#  min_heap = 20008<cr><lf>
+#  current_time = 13<cr><lf>
+<cr><lf>OK<cr><lf>
+
+AT+S.STS=wifi_bssid
+#  wifi_bssid = 00:00:00:00:00:00<cr><lf>
+<cr><lf>OK<cr><lf>
+
+AT+S.PEERS
+# Size of peer table: 1<cr><lf>
+#  0.link_id = 0<cr><lf>
+#  0.state = 4<cr><lf>
+#  0.addr = 00:00:00:00:00:00<cr><lf>
+#  0.last_rx = 14<cr><lf>
+#  0.last_tx = 9<cr><lf>
+#  0.rx_drops = 0<cr><lf>
+#  0.tx_drops = 0<cr><lf>
+#  0.rx_pkts = 16<cr><lf>
+#  0.tx_pkts = 10<cr><lf>
+#  0.tx_errs = 0<cr><lf>
+#  0.rate_mask = 0x003FFFCF<cr><lf>
+#  0.cur_rate_idx = 3<cr><lf>
+#  0.cur_rate_ok = 4<cr><lf>
+#  0.cur_rate_fail = 0<cr><lf>
+#  0.tx_consec_fail = 0<cr><lf>
+#  0.rx_seqnum = 0x00000030<cr><lf>
+#  0.rx_seqnum_mc = 0x00006A10<cr><lf>
+#  0.rx_rssi = -58<cr><lf>
+#  0.rx_rateidx = 0<cr><lf>
+#  0.setprot = 3<cr><lf>
+#  0.listen_interval = 0<cr><lf>
+#  0.capinfo = 0x00000431<cr><lf>
+<cr><lf>OK<cr><lf>
+
+AT+S.PING=192.168.0.10
+#PING: sendto 192.168.0.10<cr><lf>
+<cr><lf>OK<cr><lf>
+
+AT+S.PING=192.168.0.245
+#PING: sendto 192.168.0.245<cr><lf>
+<cr><lf>ERROR: Timed out<cr><lf>
+
+AT+S.SOCKON=192.168.0.10,8775,tcp,ind
+<cr><lf> ID: 00<cr><lf>
+<cr><lf>OK<cr><lf>
+
+helloSOCKW=00,5
+<cr><lf>OK<cr><lf>
+
+AT+S.SOCKQ=00
+<cr><lf> DATALEN: 0<cr><lf>
+<cr><lf>OK<cr><lf>
+
+AT+S.SOCKR=00,5
+<cr><lf>ERROR: Not enough data in buffer<cr><lf>
+
+AT+S.SOCKC=00
+<cr><lf>OK<cr><lf>
+
+AT+S.SETTIME=1000
+<cr><lf>ERROR: Command not found<cr><lf>
+
+AT+S.SOCKD=65000,t
+<cr><lf>OK<cr><lf>
+
+AT+S.SOCKD=0
+<cr><lf>OK<cr><lf>
+
+AT+S.FSC=/test.html,512
+<cr><lf>OK<cr><lf>
+
+AT+S.FSA=/test.html,5 (hello)
+<cr><lf>OK<cr><lf>
+
+AT+S.FSP=/test.html
+hello<cr><lf>
+OK<cr><lf>
+
+AT+S.FSL
+ D 5 /test.html<cr><lf>
+ I 174 /status.shtml<cr><lf>
+ I 614 /index.html<cr><lf>
+ I 180 /message.shtml<cr><lf>
+ I 193 /config.shtml<cr><lf>
+ I 157 /peers.shtml<cr><lf>
+ I 384 /output_demo.html<cr><lf>
+ I 461 /input_demo.shtml<cr><lf>
+ I 3447 /firstset.html<cr><lf>
+ I 2898 /remote.html<cr><lf>
+ I 212 /404.html<cr><lf>
+<cr><lf>OK<cr><lf>
+
+AT+S.FSD=/test.html
+<cr><lf>OK<cr><lf>

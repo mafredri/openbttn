@@ -32,6 +32,10 @@ path=($SCRIPT/node_modules/.bin $path)
 	done
 
 	print
+
+	data_c=''
+	data_h_size=''
+	data_h_extern=''
 	for html in *.html; do
 		gzip -9 $html
 		xxd -i $html.gz > $html.xxd
@@ -39,22 +43,33 @@ path=($SCRIPT/node_modules/.bin $path)
 
 		name=$(head -n1 $html.c)
 		name=${(j..)${(Cs._.)${${name#unsigned char }%\[*}}}
-		name="const uint8_t g_Data${name}[] = {"
-		{ print $name; tail -n +2 $html.c } >> data.c
+		name="const uint8_t g_Data${name}[]"
+		data_c+="$(print "$name = {"; tail -n +2 $html.c)"$'\n'
+		data_h_extern+="extern ${name};"$'\n'
 
 		size=$(grep "^unsigned int" $html.xxd)
 		sizeNum=${${size#*\= }%;}
 		size=${(U)${${size#unsigned int }%_len \=*}}
-		size="#define DATA_${size}_LENGTH ${sizeNum}"
-		print $size >> data.h
+		data_h_size+="#define DATA_${size}_LENGTH ${sizeNum}"$'\n'
 	done
 
-	{
-		cat data.h
-		cat data.c
-	} | pbcopy
-	pbpaste
-)
+	cat <<EOF > $SCRIPT/../../src/data.c
+#include <stdint.h>
 
+#include "data.h"
+
+${data_c}
+EOF
+	cat <<EOF > $SCRIPT/../../src/data.h
+#ifndef DATA_H
+#define DATA_H
+
+#include <stdint.h>
+
+${data_h_size}
+${data_h_extern}
+#endif /* DATA_H */
+EOF
+)
 
 rm -r $TMP

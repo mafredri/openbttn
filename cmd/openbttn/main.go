@@ -141,6 +141,9 @@ func otaHandler(otaPath string) func(w http.ResponseWriter, r *http.Request) {
 			n, err := f.Read(b)
 			if err == io.EOF {
 				keepGoing = false
+				if n == 0 {
+					break
+				}
 			} else if err != nil {
 				panic(err)
 			}
@@ -149,12 +152,20 @@ func otaHandler(otaPath string) func(w http.ResponseWriter, r *http.Request) {
 			io.CopyN(w, content, int64(n))
 			numBytes += n
 
-			// Pause 300 ms between chunks to give more
+			log.Printf("Sent %d/%s OTA bytes in %v", numBytes, size, time.Now().Sub(start))
+
+			// Pause a bit between chunks to give some
 			// time for the module to store each chunk.
-			time.Sleep(300 * time.Millisecond)
+			delay := 300 * time.Millisecond
+			select {
+			case <-r.Context().Done():
+				log.Printf("Client disconnected, sent %d/%s OTA bytes in %v", numBytes, size, time.Now().Sub(start))
+				return
+			case <-time.After(delay):
+			}
 		}
 
-		log.Printf("Sent %d/%s OTA bytes in %v", numBytes, size, time.Now().Sub(start))
+		log.Println("OTA complete!")
 	}
 }
 
